@@ -147,7 +147,7 @@ body:not(.person) .per-only{display:none!important}
   </div>
   <div id="mainrow">
     <button class="main go" id="cam"><span class="ic">📷</span><span class="tx">撮影開始</span></button>
-    <button class="main on" id="fx"><span class="ic">🌕</span><span class="tx">背景合成</span></button>
+    <button class="main" id="fx"><span class="ic">🌕</span><span class="tx">背景合成</span></button>
     <button class="main" id="snap"><span class="ic">💾</span><span class="tx">写真を保存</span></button>
     <button class="main" id="recbtn"><span class="ic">⏺</span><span class="tx">録画</span></button>
     <button class="main" id="cfg"><span class="ic">⚙</span><span class="tx">設定</span></button>
@@ -164,10 +164,10 @@ body:not(.person) .per-only{display:none!important}
 <script>
 (()=>{
 const $=id=>document.getElementById(id);
-const VERSION='2026-10-18e';$('ver').textContent='v'+VERSION;
+const VERSION='2026-10-18f';$('ver').textContent='v'+VERSION;
 const cv=$('view'),ctx=cv.getContext('2d'),vid=$('vid');
 let W=0,H=0,DPR=1,ppd=10;
-const S={person:false,mirror:true,cut:1,inv:false,tshadow:.8,oshadow:1,oshade:.8,eshine:.4,gain:6,dist:.6,k:1.2,track:true,diff:false,tol:26,soft:12,keyOn:true,key:[0,177,64],keyName:'green',sunAz:160,con:1.2,earthSize:4,sunEl:14,fov:66,stars:.8,render:true,
+const S={person:false,mirror:true,cut:1,inv:false,tshadow:.8,oshadow:1,oshade:.8,eshine:.4,gain:6,dist:.6,k:1.2,track:true,diff:false,tol:26,soft:12,keyOn:true,key:[0,177,64],keyName:'green',sunAz:160,con:1.2,earthSize:4,sunEl:14,fov:66,stars:.8,render:false,
   earthAz:35,earthEl:22,facing:'environment'};
 function resize(){
   W=innerWidth;H=innerHeight;
@@ -406,8 +406,8 @@ function processVideo(lightX,cosL,sunC){
     }
   }
   kx.putImageData(im,0,0);
-  if(S.person){if(!raw){kx.globalCompositeOperation='destination-in';kx.drawImage(pmc,0,0,kw,kh);kx.globalCompositeOperation='source-over'}}
-  else if(S.track&&TG){kx.globalCompositeOperation='destination-in';kx.drawImage(mcv,0,0,kw,kh);kx.globalCompositeOperation='source-over'}
+  if(S.person){if(!raw&&S.render){kx.globalCompositeOperation='destination-in';kx.drawImage(pmc,0,0,kw,kh);kx.globalCompositeOperation='source-over'}}
+  else if(S.track&&TG&&S.render){kx.globalCompositeOperation='destination-in';kx.drawImage(mcv,0,0,kw,kh);kx.globalCompositeOperation='source-over'}
   let x0=-1,x1=-1,y0=-1,y1=-1;
   for(let x=0;x<kw;x++)if(col[x]>=4){if(x0<0)x0=x;x1=x}
   for(let y=0;y<kh;y++)if(row[y]>=4){if(y0<0)y0=y;y1=y}
@@ -828,8 +828,8 @@ document.querySelectorAll('#tabs .tab').forEach(b=>{b.onclick=()=>{curTab=b.data
 function idleHint(){
   const h=$('hint');hintShown=false;hintTxt='';h.style.display='';
   h.innerHTML=S.person
-    ?'「📷 撮影開始」でカメラを起動します。<br><b>人物を自動で検出</b>し、人物を最前面に残して、<br>それ以外を月面・宇宙空間に置き換えます。'
-    :'「📷 撮影開始」でカメラを起動します。<br>映った<b>ものをタップ</b>すると、そのものが最前面に残り、<br>それ以外が月面・宇宙空間に置き換わります。';
+    ?'「📷 撮影開始」でカメラを起動します。<br><b>人物を自動で検出</b>し、人物を最前面に残して、<br>それ以外を月面・宇宙空間に置き換えます。<br>(「🌕 背景合成」をONにすると、合成されます)'
+    :'「📷 撮影開始」でカメラを起動します。<br>映った<b>ものをタップ</b>すると、そのものが最前面に残り、<br>それ以外が月面・宇宙空間に置き換わります。<br>(「🌕 背景合成」をONにすると、合成されます)';
 }
 function pill(el,text,cls){el.textContent=text;el.className='pill'+(cls?' '+cls:'')}
 function refreshUI(){
