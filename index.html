@@ -60,6 +60,12 @@ button:active{transform:scale(.96)}
     <label>地球の大きさ<input type="range" id="earth" min="1" max="12" value="4" step="0.5"><span class="val" id="earthv"></span></label>
     <label>星の量<input type="range" id="stars" min="0" max="100" value="80"><span class="val" id="starsv"></span></label>
     <div class="sub">カメラ・視点</div>
+    <div class="sub">人物モード</div>
+    <div class="row" style="justify-content:flex-start;margin-bottom:4px">
+      <button class="chip on" id="mirror">🪞 鏡像表示(前面カメラ)</button>
+      <button class="chip" id="invmask">⇄ マスク反転</button>
+    </div>
+    <label>上半身の下端<input type="range" id="cut" min="20" max="100" value="100"><span class="val" id="cutv"></span></label>
     <div class="sub">月面との距離感(ピンチでも高度を変更)</div>
     <label>カメラ高度<input type="range" id="alt" min="0" max="100" value="25"><span class="val" id="altv"></span></label>
     <label>距離連動の強さ<input type="range" id="kk" min="0" max="200" value="120"><span class="val" id="kkv"></span></label>
@@ -76,6 +82,7 @@ button:active{transform:scale(.96)}
     <button class="chip" data-v="horizon">➖ 水平線</button>
     <button class="chip" data-v="earth">🌍 地球を見る</button>
     <button class="chip" data-v="sky">✨ 星空</button>
+    <button class="chip on" id="modebtn">📦 ものモード</button>
     <button class="chip" id="gyro">🧭 ジャイロ</button>
     <button class="chip" id="zero">⌖ 正面リセット</button>
     <button class="chip" id="untrack">✖ 対象解除</button>
@@ -101,7 +108,7 @@ button:active{transform:scale(.96)}
 const $=id=>document.getElementById(id);
 const cv=$('view'),ctx=cv.getContext('2d'),vid=$('vid');
 let W=0,H=0,DPR=1,ppd=10;
-const S={tshadow:.8,oshadow:1,oshade:.8,eshine:.4,gain:6,dist:.6,k:1.2,track:true,diff:false,tol:26,soft:12,keyOn:true,key:[0,177,64],keyName:'green',sunAz:160,con:1.2,earthSize:4,sunEl:14,fov:66,stars:.8,render:true,
+const S={person:false,mirror:true,cut:1,inv:false,tshadow:.8,oshadow:1,oshade:.8,eshine:.4,gain:6,dist:.6,k:1.2,track:true,diff:false,tol:26,soft:12,keyOn:true,key:[0,177,64],keyName:'green',sunAz:160,con:1.2,earthSize:4,sunEl:14,fov:66,stars:.8,render:true,
   earthAz:35,earthEl:22,facing:'environment'};
 function resize(){
   W=innerWidth;H=innerHeight;
@@ -300,8 +307,8 @@ function coverRect(sw,sh){const s=Math.max(W/sw,H/sh);return{s,dx:(W-sw*s)/2,dy:
 function processVideo(lightX,cosL,sunC){
   const vw=vid.videoWidth,vh=vid.videoHeight;if(!vw||vid.readyState<2)return null;
   const kw=480,kh=Math.round(kw*vh/vw);if(kc.width!==kw||kc.height!==kh){kc.width=kw;kc.height=kh;refData=null}
-  const raw=S.track&&!trackStep(vw,vh,kw,kh);
-  kx.drawImage(vid,0,0,kw,kh);
+  const raw=S.person?!personStep(vw,vh,kw,kh):(S.track&&!trackStep(vw,vh,kw,kh)),keying=S.keyOn&&!S.track&&!S.person;
+  drawVid(kx,kw,kh);
   const im=kx.getImageData(0,0,kw,kh),d=im.data;
   if(capRef){refData=new Uint8ClampedArray(d);capRef=false;$('hint').style.display='none'}
   if(pick){const cr=coverRect(kw,kh);const px=Math.round((pick.x-cr.dx)/cr.s),py=Math.round((pick.y-cr.dy)/cr.s);
@@ -316,14 +323,14 @@ function processVideo(lightX,cosL,sunC){
   for(let y=0,i=0;y<kh;y++){
     for(let x=0;x<kw;x++,i+=4){
       let r=d[i],g=d[i+1],b=d[i+2],a=255;
-      if(S.keyOn&&!S.track){let dist;
+      if(keying){let dist;
         if(diffMode){if(ref){const dr=r-ref[i],dg=g-ref[i+1],db=b-ref[i+2];dist=Math.sqrt(dr*dr+dg*dg+db*db)*.2264}else dist=0}
         else if(chroma){ // chrominance distance: ignores brightness, so grey/white objects stay opaque
           const cb=-.169*r-.331*g+.5*b,cr=.5*r-.419*g-.081*b,dcb=cb-kCb,dcr=cr-kCr;dist=Math.sqrt(dcb*dcb+dcr*dcr)*.78}
         else{const dr=r-kr,dg=g-kg,db=b-kb;dist=Math.sqrt(dr*dr+dg*dg+db*db)*.2264}
         if(dist<=tol)a=0;else if(dist<tol+soft){const t=(dist-tol)/soft;a=t*t*(3-2*t)*255|0}}
       if(a>0){
-        if(S.keyOn&&!S.track&&chroma&&!diffMode){ // spill suppression
+        if(keying&&chroma&&!diffMode){ // spill suppression
           const o=dom===1?Math.max(r,b):dom===2?Math.max(r,g):Math.max(g,b);
           if(dom===1&&g>o)g=o+(g-o)*.15;else if(dom===2&&b>o)b=o+(b-o)*.15;else if(dom===0&&r>o)r=o+(r-o)*.15}
         if(S.render&&!raw){
@@ -339,14 +346,16 @@ function processVideo(lightX,cosL,sunC){
     }
   }
   kx.putImageData(im,0,0);
-  if(S.track&&TG){kx.globalCompositeOperation='destination-in';kx.drawImage(mcv,0,0,kw,kh);kx.globalCompositeOperation='source-over'}
+  if(S.person){if(!raw){kx.globalCompositeOperation='destination-in';kx.drawImage(pmc,0,0,kw,kh);kx.globalCompositeOperation='source-over'}}
+  else if(S.track&&TG){kx.globalCompositeOperation='destination-in';kx.drawImage(mcv,0,0,kw,kh);kx.globalCompositeOperation='source-over'}
   let x0=-1,x1=-1,y0=-1,y1=-1;
   for(let x=0;x<kw;x++)if(col[x]>=4){if(x0<0)x0=x;x1=x}
   for(let y=0;y<kh;y++)if(row[y]>=4){if(y0<0)y0=y;y1=y}
   if(S.keyOn&&x0>=0&&x1-x0>12&&y1-y0>12){const nb={x0,x1,y1};
     if(!bbox)bbox=nb;else{for(const k in nb)bbox[k]+=(nb[k]-bbox[k])*.3}}
   else if(!S.keyOn||x0<0)bbox=null;
-  if(S.track){if(TG&&tgLost<=6){const nb={x0:TG.box.x0*kw/MW,x1:(TG.box.x1+1)*kw/MW,y0:TG.box.y0*kh/MH,y1:(TG.box.y1+1)*kh/MH};if(!bbox)bbox=nb;else for(const k in nb)bbox[k]+=(nb[k]-bbox[k])*.4}else bbox=null}
+  if(S.person){if(pBox&&!raw){const nb={x0:pBox.x0*kw/PWD,x1:(pBox.x1+1)*kw/PWD,y0:pBox.y0*kh/pcv.height,y1:(pBox.y1+1)*kh/pcv.height};if(!bbox)bbox=nb;else for(const k in nb)bbox[k]+=(nb[k]-bbox[k])*.4}else bbox=null}
+  else if(S.track){if(TG&&tgLost<=6){const nb={x0:TG.box.x0*kw/MW,x1:(TG.box.x1+1)*kw/MW,y0:TG.box.y0*kh/MH,y1:(TG.box.y1+1)*kh/MH};if(!bbox)bbox=nb;else for(const k in nb)bbox[k]+=(nb[k]-bbox[k])*.4}else bbox=null}
   return{kw,kh,raw};
 }
 
@@ -459,17 +468,73 @@ function trackStep(vw,vh,kw,kh){ // returns true when a target exists
   const mh=Math.round(MW*vh/vw);
   if(mh!==MH||sc0.width!==MW){MH=mh;sc0.width=mcv.width=MW;sc0.height=mcv.height=MH;TG=null;Aal=null;maskImg=null}
   if(!TG&&!tapReq)return false;
-  sxc.drawImage(vid,0,0,MW,MH);const d=sxc.getImageData(0,0,MW,MH).data;
+  drawVid(sxc,MW,MH);const d=sxc.getImageData(0,0,MW,MH).data;
   if(tapReq){const cr=coverRect(MW,MH);startTarget(d,(tapReq.x-cr.dx)/cr.s,(tapReq.y-cr.dy)/cr.s);tapReq=null}
   else if(TG)trackFrame(d);
   if(TG)writeMask();
   return !!TG;
 }
+// ---------- person mode: automatic person segmentation (MediaPipe selfie segmenter, bundled under ./mediapipe) ----------
+const PWD=320;
+const pcv=document.createElement('canvas'),pctx=pcv.getContext('2d',{willReadFrequently:true}),pmc=document.createElement('canvas'),pmx=pmc.getContext('2d');
+let seg=null,segState='idle',segErr='',segDelegate='GPU',pImg=null,pA=null,pBox=null,pInfo=null,lastTs=0,hadInfo=false;
+function mirrorOn(){return S.mirror&&S.facing==='user'}
+function drawVid(c,w,h){if(mirrorOn()){c.save();c.translate(w,0);c.scale(-1,1);c.drawImage(vid,0,0,w,h);c.restore()}else c.drawImage(vid,0,0,w,h)}
+async function makeSeg(mp,fs,delegate){
+  return mp.ImageSegmenter.createFromOptions(fs,{baseOptions:{modelAssetPath:'./mediapipe/selfie_segmenter.tflite',delegate},runningMode:'VIDEO',outputConfidenceMasks:true,outputCategoryMask:false})}
+let mpMod=null,mpFiles=null;
+async function loadSeg(delegate){
+  segState='loading';
+  try{
+    if(!mpMod){mpMod=await import('./mediapipe/vision_bundle.mjs');mpFiles=await mpMod.FilesetResolver.forVisionTasks('./mediapipe/wasm')}
+    try{seg=await makeSeg(mpMod,mpFiles,delegate);segDelegate=delegate}catch(e){if(delegate==='GPU'){seg=await makeSeg(mpMod,mpFiles,'CPU');segDelegate='CPU'}else throw e}
+    segState='ready';
+  }catch(e){segState='error';segErr=String(e&&e.message||e)}
+}
+function personStep(vw,vh,kw,kh){ // returns true when a person mask was produced this frame
+  const ph=Math.round(PWD*vh/vw);
+  if(pcv.width!==PWD||pcv.height!==ph){pcv.width=pmc.width=PWD;pcv.height=pmc.height=ph;pImg=null;pA=null}
+  if(segState==='idle')loadSeg('GPU');
+  if(segState!=='ready'){pInfo=null;return false}
+  drawVid(pctx,PWD,ph);
+  const N=PWD*ph;if(!pA){pA=new Float32Array(N);pImg=pmx.createImageData(PWD,ph)}
+  const col=new Uint16Array(PWD),row=new Uint16Array(ph);let area=0,ok=false;
+  const cutY=Math.max(.15,S.cut)*ph,fade=Math.max(2,ph*.035),o=pImg.data;
+  try{
+    lastTs=Math.max(lastTs+1,performance.now());
+    seg.segmentForVideo(pcv,lastTs,res=>{
+      const ms=res.confidenceMasks;if(!ms||!ms.length)return;
+      const m=ms[ms.length>1?1:0],arr=m.getAsFloat32Array(),mw=m.width,mh=m.height,inv=S.inv;
+      for(let y=0;y<ph;y++){const sy=((y*mh/ph)|0)*mw;
+        for(let x=0;x<PWD;x++){
+          let v=arr[sy+((x*mw/PWD)|0)];if(inv)v=1-v;
+          v=v<=.35?0:v>=.75?1:((t)=>t*t*(3-2*t))((v-.35)/.4);
+          const p=y*PWD+x;pA[p]=pA[p]*.4+v*.6;
+          const cf=y>cutY?0:y>cutY-fade?(cutY-y)/fade:1,al=pA[p]*cf;
+          o[p*4]=o[p*4+1]=o[p*4+2]=255;o[p*4+3]=al*255;
+          if(al>.5){col[x]++;row[y]++;area++}
+        }}
+      ok=true;
+    });
+  }catch(e){
+    if(segDelegate==='GPU'){seg=null;segState='loading';loadSeg('CPU')}else{segState='error';segErr=String(e&&e.message||e)}
+    pInfo=null;return false}
+  if(!ok){pInfo=null;return false}
+  pmx.putImageData(pImg,0,0);
+  let x0=-1,x1=-1,y0=-1,y1=-1;
+  for(let x=0;x<PWD;x++)if(col[x]>=3){if(x0<0)x0=x;x1=x}
+  for(let y=0;y<ph;y++)if(row[y]>=3){if(y0<0)y0=y;y1=y}
+  if(x0>=0&&area>40){pBox={x0,x1,y0,y1};pInfo={size:Math.sqrt(area/N),cx:(x0+x1+1)/2/PWD,cy:(y0+y1+1)/2/ph};return true}
+  pInfo=null;pBox=null;return false;
+}
 function updateHint(){
   const h=$('hint');
-  if(!camOn||!S.track){if(hintShown){h.style.display='none';hintShown=false}return}
+  if(!camOn||(!S.track&&!S.person)){if(hintShown){h.style.display='none';hintShown=false}return}
   let t=null;
-  if(!TG)t='撮影したいもの(模型)をタップしてください';
+  if(S.person){
+    if(segState==='error')t='人物モデルを読み込めませんでした: '+segErr;
+    else if(segState!=='ready')t='人物モデルを読み込み中…(初回は少し時間がかかります)';
+  }else if(!TG)t='撮影したいもの(模型)をタップしてください';
   else if(tgLost>6)t='対象を見失いました。もう一度ものをタップしてください';
   if(t){if(t!==hintTxt||!hintShown){h.textContent=t;h.style.display='';hintTxt=t}hintShown=true}
   else if(hintShown){h.style.display='none';hintShown=false;hintTxt=''}
@@ -516,7 +581,7 @@ cv.addEventListener('pointermove',e=>{
 const upFn=e=>{const had=ptrs.delete(e.pointerId);
   if(had&&!pinched&&drag&&!drag.moved&&e.type==='pointerup'){
     if(armPick){pick={x:e.clientX,y:e.clientY};armPick=false;$('hint').style.display='none'}
-    else if(S.track&&camOn)tapReq={x:e.clientX,y:e.clientY}}
+    else if(S.track&&!S.person&&camOn)tapReq={x:e.clientX,y:e.clientY}}
   if(ptrs.size===0){drag=null}};
 cv.addEventListener('pointerup',upFn);cv.addEventListener('pointercancel',upFn);
 
@@ -563,8 +628,10 @@ function frame(){
   if(camOn)dim=processVideo(lightX,cosL,sc);
   // ---- virtual camera position from the real camera's motion relative to the tapped object ----
   if(!(S.dist>0))S.dist=.6;
-  if(camOn&&dim&&S.track&&TG&&tgLost<=6){
-    const cr=coverRect(dim.kw,dim.kh),size=Math.sqrt(TG.area)/MW,ocx=(TG.box.x0+TG.box.x1+1)/2/MW,ocy=(TG.box.y0+TG.box.y1+1)/2/MH;
+  const info=S.person?(dim&&!dim.raw?pInfo:null):(S.track&&TG&&tgLost<=6?{size:Math.sqrt(TG.area)/MW,cx:(TG.box.x0+TG.box.x1+1)/2/MW,cy:(TG.box.y0+TG.box.y1+1)/2/MH}:null);
+  if(S.person&&info&&!hadInfo)needRef=true;hadInfo=!!info;
+  if(camOn&&dim&&info){
+    const cr=coverRect(dim.kw,dim.kh),size=info.size,ocx=info.cx,ocy=info.cy;
     const spx=cr.dx+ocx*dim.kw*cr.s,spy=cr.dy+ocy*dim.kh*cr.s;
     if(needRef||!objRef){objRef={size,d:null};needRef=false;sSm=1;Tsm=[0,0,0]}
     const sr=clamp(objRef.size/size,.2,5);sSm+=(sr-sSm)*.2; // >1: device moved away from the object
@@ -589,7 +656,7 @@ function frame(){
     if(sunIn){ctx.fillStyle='rgba(255,245,225,.05)';ctx.fillRect(0,0,W,H)}
     if(camOn&&dim){
       const cr=coverRect(dim.kw,dim.kh);
-      if(bbox&&S.oshadow>0)drawObjShadow(R,sunV,cr,camH,camX,camZ,lightX);
+      if(bbox&&S.oshadow>0&&!S.person)drawObjShadow(R,sunV,cr,camH,camX,camZ,lightX);
       ctx.drawImage(kc,cr.dx,cr.dy,dim.kw*cr.s,dim.kh*cr.s);
     }
   }
@@ -614,6 +681,14 @@ async function startCam(){
 function stopCam(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;camOn=false;bbox=null;
   $('cam').innerHTML='📷<br>撮影開始';$('cam').classList.remove('red');$('hint').style.display=''}
 $('cam').onclick=()=>camOn?stopCam():startCam();
+function applyMode(){
+  $('modebtn').textContent=S.person?'🧍 人物モード':'📦 ものモード';$('modebtn').classList.toggle('on',!S.person);
+  needRef=true;objRef=null;sSm=1;Tsm=[0,0,0];bbox=null;pInfo=null;hadInfo=false;
+  S.facing=S.person?'user':'environment';if(camOn)startCam();
+}
+$('modebtn').onclick=()=>{S.person=!S.person;applyMode()};
+$('mirror').onclick=e=>{S.mirror=!S.mirror;e.target.classList.toggle('on',S.mirror)};
+$('invmask').onclick=e=>{S.inv=!S.inv;e.target.classList.toggle('on',S.inv)};
 $('flip').onclick=()=>{S.facing=S.facing==='environment'?'user':'environment';if(camOn)startCam()};
 $('fx').onclick=e=>{S.render=!S.render;$('fx').classList.toggle('on',S.render)};
 $('cfg').onclick=()=>{const p=$('panel');p.style.display=p.style.display==='block'?'none':'block'};
@@ -621,7 +696,7 @@ $('cfg').onclick=()=>{const p=$('panel');p.style.display=p.style.display==='bloc
 // ---------- settings ----------
 function bind(id,key,fmt,scale=1){const el=$(id),out=$(id+'v');const f=()=>{S[key]=el.value*scale;out.textContent=fmt(el.value)};el.oninput=f;f()}
 bind('tol','tol',v=>v);bind('soft','soft',v=>v);bind('sun','sunAz',v=>v+'°');bind('con','con',v=>(v/100).toFixed(2),.01);
-bind('earth','earthSize',v=>v+'°');bind('sunel','sunEl',v=>v+'°');bind('tsh','tshadow',v=>v+'%',.01);bind('osh','oshadow',v=>v+'%',.01);bind('oshd','oshade',v=>v+'%',.01);bind('esh','eshine',v=>v+'%',.01);
+bind('earth','earthSize',v=>v+'°');bind('sunel','sunEl',v=>v+'°');bind('tsh','tshadow',v=>v+'%',.01);bind('cut','cut',v=>v+'%',.01);bind('osh','oshadow',v=>v+'%',.01);bind('oshd','oshade',v=>v+'%',.01);bind('esh','eshine',v=>v+'%',.01);
 ['sun','sunel'].forEach(id=>$(id).addEventListener('input',()=>{shadowDirty=true}));bind('kk','k',v=>(v/100).toFixed(2),.01);bind('gain','gain',v=>v+'×');bind('dist','dist',v=>v+'cm',.01);
 $('alt').oninput=()=>{hBase=.3*Math.pow(10,$('alt').value/100*2.8);$('altv').textContent=fmtAlt(hBase)};$('alt').oninput();bind('fov','fov',v=>v+'°');
 $('qual').oninput=()=>{quality=$('qual').value/100;$('qualv').textContent=$('qual').value+'%'};$('qual').oninput();bind('stars','stars',v=>v+'%',.01);
