@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Lunar Cam – 月面撮影シミュレータ</title>
+<style>
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
+html,body{margin:0;height:100%;background:#000;color:#e8ecf4;font:14px -apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif;overflow:hidden;overscroll-behavior:none}
+canvas{position:fixed;inset:0;width:100%;height:100%;touch-action:none;display:block}
+#top{position:fixed;top:0;left:0;right:0;padding:calc(env(safe-area-inset-top) + 8px) 12px 6px;display:flex;justify-content:space-between;align-items:center;pointer-events:none;font-size:12px;color:#aab4c8;text-shadow:0 1px 3px #000}
+#rec{display:none;color:#fff;background:#d22;border-radius:10px;padding:2px 8px;font-weight:600}
+#hint{position:fixed;left:16px;right:16px;top:20%;text-align:center;font-size:15px;line-height:1.6;color:#dfe6f5;text-shadow:0 1px 6px #000;pointer-events:none}
+#bottom{position:fixed;left:0;right:0;bottom:0;padding:8px 8px calc(env(safe-area-inset-bottom) + 8px);background:linear-gradient(transparent,rgba(0,0,0,.7) 35%);display:flex;flex-direction:column;gap:8px}
+.row{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
+button{font:inherit;color:#e8ecf4;background:rgba(40,48,70,.82);border:1px solid rgba(255,255,255,.18);border-radius:12px;padding:9px 10px;min-width:58px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+button.main{flex:1;max-width:120px;font-weight:600}
+button.chip{padding:6px 10px;min-width:0;font-size:13px;border-radius:16px}
+button.on{background:#2f6df0;border-color:#8db1ff}
+button.red{background:#c62828}
+button:active{transform:scale(.96)}
+#panel{display:none;background:rgba(14,18,30,.92);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:10px 14px;max-height:42vh;overflow:auto;-webkit-overflow-scrolling:touch}
+#panel label{display:grid;grid-template-columns:96px 1fr 38px;align-items:center;gap:8px;margin:6px 0;font-size:13px}
+#panel input[type=range]{width:100%}
+#panel .sub{font-size:12px;color:#9aa6bd;margin:8px 0 4px}
+#panel .val{text-align:right;color:#9db4ff;font-variant-numeric:tabular-nums}
+#sw{display:inline-block;width:16px;height:16px;border-radius:4px;border:1px solid #fff;vertical-align:middle}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:calc(env(safe-area-inset-top) + 12px) 12px calc(env(safe-area-inset-bottom) + 12px);z-index:10}
+#modal img,#modal video{max-width:100%;max-height:72vh;border-radius:8px;-webkit-user-select:auto;user-select:auto;-webkit-touch-callout:default}
+#modal p{margin:0;color:#aab4c8;font-size:12px;text-align:center}
+</style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="top"><span>🌕 LUNAR CAM</span><span id="rec">● REC 00:00</span><span id="status"></span></div>
+<div id="hint">「📷 撮影開始」でカメラを起動します。<br>映った<b>ものをタップ</b>すると、そのものを最前面に残し、<br>それ以外が月面・宇宙空間に置き換わります。</div>
+
+<div id="bottom">
+  <div id="panel">
+    <div class="sub">背景除去(クロマキー)</div>
+    <div class="row" id="keychips" style="justify-content:flex-start;margin-bottom:4px">
+      <button class="chip on" data-k="track">👆 タップで対象指定</button><button class="chip" data-k="green">緑</button><button class="chip" data-k="blue">青</button>
+      <button class="chip" data-k="black">黒</button><button class="chip" data-k="white">白</button>
+      <button class="chip" data-k="pick">🎯 タップで色指定</button><button class="chip" data-k="diff">📸 背景を登録(差分)</button><button class="chip" data-k="off">除去なし</button>
+      <span id="sw"></span>
+    </div>
+    <label>除去の強さ<input type="range" id="tol" min="4" max="70" value="26"><span class="val" id="tolv"></span></label>
+    <label>境界ぼかし<input type="range" id="soft" min="2" max="40" value="12"><span class="val" id="softv"></span></label>
+    <div class="sub">宇宙の見た目</div>
+    <label>太陽の方位<input type="range" id="sun" min="0" max="360" value="160"><span class="val" id="sunv"></span></label>
+    <label>被写体コントラスト<input type="range" id="con" min="80" max="230" value="120"><span class="val" id="conv"></span></label>
+    <label>太陽の高度<input type="range" id="sunel" min="2" max="80" value="14"><span class="val" id="sunelv"></span></label>
+    <label>地球の大きさ<input type="range" id="earth" min="1" max="12" value="4" step="0.5"><span class="val" id="earthv"></span></label>
+    <label>星の量<input type="range" id="stars" min="0" max="100" value="80"><span class="val" id="starsv"></span></label>
+    <div class="sub">カメラ・視点</div>
+    <div class="sub">月面との距離感(ピンチでも高度を変更)</div>
+    <label>カメラ高度<input type="range" id="alt" min="0" max="100" value="25"><span class="val" id="altv"></span></label>
+    <label>距離連動の強さ<input type="range" id="kk" min="0" max="200" value="120"><span class="val" id="kkv"></span></label>
+    <label>移動の倍率<input type="range" id="gain" min="1" max="30" value="6"><span class="val" id="gainv"></span></label>
+    <label>撮影距離<input type="range" id="dist" min="20" max="200" value="60"><span class="val" id="distv"></span></label>
+    <label>画角(長辺)<input type="range" id="fov" min="40" max="100" value="66"><span class="val" id="fovv"></span></label>
+    <label>背景の画質<input type="range" id="qual" min="40" max="150" value="100"><span class="val" id="qualv"></span></label>
+    <div class="row" style="justify-content:flex-start">
+      <button class="chip" id="flip">🔄 前面/背面</button>
+    </div>
+  </div>
+  <div class="row" id="presets">
+    <button class="chip" data-v="ground">⬇ 地表</button>
+    <button class="chip" data-v="horizon">➖ 水平線</button>
+    <button class="chip" data-v="earth">🌍 地球を見る</button>
+    <button class="chip" data-v="sky">✨ 星空</button>
+    <button class="chip" id="gyro">🧭 ジャイロ</button>
+    <button class="chip" id="zero">⌖ 正面リセット</button>
+    <button class="chip" id="untrack">✖ 対象解除</button>
+  </div>
+  <div class="row">
+    <button class="main" id="cam">📷<br>撮影開始</button>
+    <button class="main on" id="fx">🌕<br>レンダリング</button>
+    <button class="main" id="snap">💾<br>画面保存</button>
+    <button class="main" id="recbtn">⏺<br>録画</button>
+    <button class="main" id="cfg">🎛<br>設定</button>
+  </div>
+</div>
+
+<div id="modal">
+  <div id="mediabox"></div>
+  <p id="mhint"></p>
+  <div class="row"><button id="mshare">⬆ 保存 / 共有</button><button id="mclose">閉じる</button></div>
+</div>
+<video id="vid" playsinline muted autoplay style="display:none"></video>
+
+<script>
+(()=>{
+const $=id=>document.getElementById(id);
+const cv=$('view'),ctx=cv.getContext('2d'),vid=$('vid');
+let W=0,H=0,DPR=1,ppd=10;
+const S={gain:6,dist:.6,k:1.2,track:true,diff:false,tol:26,soft:12,keyOn:true,key:[0,177,64],keyName:'green',sunAz:160,con:1.2,earthSize:4,sunEl:14,fov:66,stars:.8,render:true,
+  earthAz:35,earthEl:22,facing:'environment'};
+function resize(){
+  W=innerWidth;H=innerHeight;
+  DPR=Math.max(1,Math.min(devicePixelRatio||1,2,1600/Math.max(W,H)));
+  cv.width=Math.round(W*DPR);cv.height=Math.round(H*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);ppd=Math.max(W,H)/65;
+}
+addEventListener('resize',resize);resize();
+
+// ---------- seeded random ----------
+function rng(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rnd=rng(20260607);
+const wrap=d=>(((d%360)+540)%360)-180;
+const clamp=(v,a,b)=>v<a?a:v>b?b:v;
+
+// ---------- 3D orientation math (row-major 3x3, camera -> world; world: x=east, y=up, -z=north) ----------
+const D2R=Math.PI/180;
+const mmul=(a,b)=>{const r=new Array(9);for(let i=0;i<3;i++)for(let j=0;j<3;j++)r[i*3+j]=a[i*3]*b[j]+a[i*3+1]*b[3+j]+a[i*3+2]*b[6+j];return r};
+const rotX=t=>{const c=Math.cos(t),n=Math.sin(t);return[1,0,0,0,c,-n,0,n,c]};
+const rotY=t=>{const c=Math.cos(t),n=Math.sin(t);return[c,0,n,0,1,0,-n,0,c]};
+const rotZ=t=>{const c=Math.cos(t),n=Math.sin(t);return[c,-n,0,n,c,0,0,0,1]};
+function orth(R){let a=[R[0],R[3],R[6]],b=[R[1],R[4],R[7]];
+  let l=Math.hypot(a[0],a[1],a[2]);a=a.map(v=>v/l);
+  const d=a[0]*b[0]+a[1]*b[1]+a[2]*b[2];b=[b[0]-d*a[0],b[1]-d*a[1],b[2]-d*a[2]];l=Math.hypot(b[0],b[1],b[2]);b=b.map(v=>v/l);
+  const c=[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+  return[a[0],b[0],c[0],a[1],b[1],c[1],a[2],b[2],c[2]]}
+const dirVec=(az,el)=>{az*=D2R;el*=D2R;const c=Math.cos(el);return[Math.sin(az)*c,Math.sin(el),-Math.cos(az)*c]};
+const toCam=(R,v)=>[R[0]*v[0]+R[3]*v[1]+R[6]*v[2],R[1]*v[0]+R[4]*v[1]+R[7]*v[2],R[2]*v[0]+R[5]*v[1]+R[8]*v[2]];
+const fwdAz=R=>Math.atan2(-R[2],R[8])/D2R;
+const fwdEl=R=>Math.asin(clamp(-R[5],-1,1))/D2R;
+let focal=600;
+
+// ---------- stars (real 3D directions, so roll / tilt are physically consistent) ----------
+const NS=3800,SV=new Float32Array(NS*3),sB=new Float32Array(NS),sS=new Float32Array(NS),sT=new Float32Array(NS);
+(()=>{
+  const n=(()=>{const v=[.35,.8,.5],l=Math.hypot(...v);return v.map(x=>x/l)})();
+  const cr=(a,b)=>[a[1]*b[2]-a[2]*b[1],a[2]*b[0]-a[0]*b[2],a[0]*b[1]-a[1]*b[0]];
+  let e1=cr(n,[0,1,0]);let l=Math.hypot(...e1);e1=e1.map(x=>x/l);const e2=cr(n,e1);
+  for(let i=0;i<NS;i++){
+    let v;
+    if(i<2000){const y=rnd()*2-1,ph=rnd()*6.2832,r=Math.sqrt(1-y*y);v=[r*Math.cos(ph),y,r*Math.sin(ph)];
+      const m=Math.pow(rnd(),4);sB[i]=.25+m*.75;sS[i]=.6+m*1.7}
+    else{let ph=rnd()<.5?.7+(rnd()+rnd()+rnd()-1.5)*1.1:rnd()*6.2832;const g=(rnd()+rnd()+rnd()-1.5)*.16;
+      v=[e1[0]*Math.cos(ph)+e2[0]*Math.sin(ph)+n[0]*g,e1[1]*Math.cos(ph)+e2[1]*Math.sin(ph)+n[1]*g,e1[2]*Math.cos(ph)+e2[2]*Math.sin(ph)+n[2]*g];
+      const q=Math.hypot(...v);v=v.map(x=>x/q);sB[i]=.1+rnd()*.35;sS[i]=.6+rnd()*.5}
+    SV[i*3]=v[0];SV[i*3+1]=v[1];SV[i*3+2]=v[2];sT[i]=rnd();
+  }
+})();
+function drawStars(R){
+  const n=Math.floor(NS*S.stars),hw=W/2,hh=H/2;
+  for(let i=0;i<n;i++){
+    const vx=SV[i*3],vy=SV[i*3+1],vz=SV[i*3+2];
+    const d=-(R[2]*vx+R[5]*vy+R[8]*vz);if(d<=.02)continue;
+    const x=hw+(R[0]*vx+R[3]*vy+R[6]*vz)/d*focal,y=hh-(R[1]*vx+R[4]*vy+R[7]*vz)/d*focal;
+    if(x<-3||x>W+3||y<-3||y>H+3)continue;
+    const b=sB[i],t=sT[i];ctx.fillStyle=`rgba(${t<.3?255:230+b*25|0},${t<.3?225+b*20|0:235+b*20|0},${t>.75?255:t<.3?200:245},${b})`;
+    const z=sS[i];ctx.fillRect(x-z/2,y-z/2,z,z);
+  }
+}
+
+// ---------- earth ----------
+const earthSprite=(()=>{
+  const c=document.createElement('canvas');c.width=c.height=320;const g=c.getContext('2d'),R=160,r=rng(77);
+  const o=g.createRadialGradient(R*.8,R*.8,10,R,R,R);o.addColorStop(0,'#3b86d8');o.addColorStop(1,'#0a2a66');
+  g.fillStyle=o;g.fillRect(0,0,320,320);
+  g.save();g.beginPath();g.arc(R,R,R,0,7);g.clip();
+  for(let k=0;k<7;k++){const cx=60+r()*200,cy=50+r()*220;
+    for(let j=0;j<26;j++){const x=cx+(r()-.5)*90,y=cy+(r()-.5)*70,rr=8+r()*22;
+      g.fillStyle=r()<.35?'rgba(176,150,98,.92)':'rgba(70,128,60,.92)';g.beginPath();g.arc(x,y,rr,0,7);g.fill()}}
+  g.fillStyle='rgba(255,255,255,.9)';g.fillRect(0,0,320,26);g.fillRect(0,296,320,24);
+  for(let k=0;k<90;k++){const x=r()*320,y=r()*320,rr=10+r()*28;g.fillStyle=`rgba(255,255,255,${.25+r()*.4})`;
+    g.beginPath();g.ellipse(x,y,rr*1.8,rr*.55,r()*3,0,7);g.fill()}
+  const sh=g.createRadialGradient(R,R,R*.72,R,R,R);sh.addColorStop(0,'rgba(120,180,255,0)');sh.addColorStop(1,'rgba(120,180,255,.55)');
+  g.fillStyle=sh;g.fillRect(0,0,320,320);g.restore();return c;
+})();
+function drawEarth(R,sunV){
+  const E=dirVec(S.earthAz,S.earthEl),c=toCam(R,E),d=-c[2];if(d<=.02)return;
+  const x=W/2+c[0]/d*focal,y=H/2-c[1]/d*focal,r=Math.tan(S.earthSize*D2R)*focal;
+  if(x<-r*2||x>W+r*2||y<-r*2||y>H+r*2||r<1)return;
+  let g=ctx.createRadialGradient(x,y,r*.9,x,y,r*1.7);g.addColorStop(0,'rgba(110,165,255,.35)');g.addColorStop(1,'rgba(110,165,255,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(x,y,r*1.7,0,7);ctx.fill();
+  ctx.save();ctx.beginPath();ctx.arc(x,y,r,0,7);ctx.clip();
+  ctx.translate(x,y);ctx.rotate(Math.atan2(R[3],R[4]));ctx.drawImage(earthSprite,-r,-r,r*2,r*2);ctx.rotate(-Math.atan2(R[3],R[4]));ctx.translate(-x,-y);
+  const sc=toCam(R,sunV),dot=sc[0]*c[0]+sc[1]*c[1]+sc[2]*c[2];
+  let px=sc[0]-dot*c[0],py=sc[1]-dot*c[1],pl=Math.hypot(px,py);
+  let lx=1,ly=0;if(pl>1e-4){lx=px/pl;ly=-py/pl}
+  const cosPhi=E[0]*sunV[0]+E[1]*sunV[1]+E[2]*sunV[2],m=2*r*(1-cosPhi)/2,cx=x-lx*m,cy=y-ly*m;
+  g=ctx.createRadialGradient(cx,cy,r*.92,cx,cy,r*1.06);g.addColorStop(0,'rgba(0,0,8,.94)');g.addColorStop(1,'rgba(0,0,8,0)');
+  ctx.fillStyle=g;ctx.fillRect(x-r,y-r,r*2,r*2);ctx.restore();
+}
+function drawSun(R,sunV){
+  const c=toCam(R,sunV),d=-c[2];if(d<=.02)return 0;
+  const x=W/2+c[0]/d*focal,y=H/2-c[1]/d*focal,rad=focal*.38;
+  if(x<-rad||x>W+rad||y<-rad||y>H+rad)return 0;
+  ctx.save();ctx.globalCompositeOperation='lighter';
+  let g=ctx.createRadialGradient(x,y,0,x,y,rad);g.addColorStop(0,'rgba(255,250,235,.95)');g.addColorStop(.05,'rgba(255,240,210,.55)');g.addColorStop(1,'rgba(255,230,190,0)');
+  ctx.fillStyle=g;ctx.fillRect(x-rad,y-rad,rad*2,rad*2);
+  ctx.translate(x,y);ctx.rotate(Math.atan2(R[3],R[4]));
+  g=ctx.createLinearGradient(-W,0,W,0);g.addColorStop(0,'rgba(255,220,160,0)');g.addColorStop(.5,'rgba(255,240,210,.4)');g.addColorStop(1,'rgba(255,220,160,0)');
+  ctx.fillStyle=g;ctx.fillRect(-W,-2,W*2,4);ctx.restore();return 1;
+}
+
+// ---------- lunar terrain: height map + albedo map (tileable), mip-mapped ----------
+const TS=1024,TILE=12,NLV=7,CAMH=1.5;
+const hL=[],aL=[];
+(function genTerrain(){
+  const r=rng(4242),N=TS*TS,h=new Float32Array(N),al=new Float32Array(N);
+  const octave=(cells,amp,aamp)=>{const gr=new Float32Array(cells*cells);for(let i=0;i<gr.length;i++)gr[i]=r()*2-1;
+    for(let y=0;y<TS;y++){const fy=y/TS*cells,y0=Math.floor(fy),ty=fy-y0,sy=ty*ty*(3-2*ty),ya=(y0%cells)*cells,yb=((y0+1)%cells)*cells;
+      for(let x=0;x<TS;x++){const fx=x/TS*cells,x0=Math.floor(fx),tx=fx-x0,sx=tx*tx*(3-2*tx),xa=x0%cells,xb=(x0+1)%cells;
+        const v=(gr[ya+xa]*(1-sx)+gr[ya+xb]*sx)*(1-sy)+(gr[yb+xa]*(1-sx)+gr[yb+xb]*sx)*sy;
+        h[y*TS+x]+=v*amp;al[y*TS+x]+=v*aamp}}};
+  for(const c of[4,8,16,32,64,128,256])octave(c,TS/c*.035,.05);
+  octave(512,.16,.04);octave(1024,.12,.06);
+  const wrapAdd=(cx,cy,rad,ext,fn)=>{const R2=Math.ceil(ext);for(let dy=-R2;dy<=R2;dy++)for(let dx=-R2;dx<=R2;dx++){
+    const q=Math.hypot(dx,dy)/rad;if(q>2.4)continue;const p=(((cy+dy)%TS+TS)%TS)*TS+(((cx+dx)%TS)+TS)%TS;fn(p,q)}};
+  for(let i=0;i<80;i++){const cx=r()*TS|0,cy=r()*TS|0,rad=5+Math.pow(r(),2.6)*150,fresh=r();
+    const dep=.2*rad,rim=.07*rad;
+    wrapAdd(cx,cy,rad,rad*2.4,(p,q)=>{
+      let dh=0,da=0;
+      if(q<1){dh=-dep*(1-q*q);da=-.07*(1-q*q)}
+      if(q<1.7){const t=(q-1)/.2,e=Math.exp(-t*t),fe=q<1.5?1:(1.7-q)/.2;dh+=rim*e*fe;da+=.12*fresh*e*fe}
+      if(q>=1&&q<2.4){const f=1-(q-1)/1.4,e=f*f;dh+=rim*.3*e;da+=.05*fresh*e}
+      h[p]+=dh;al[p]+=da});
+  }
+  for(let i=0;i<900;i++){const cx=r()*TS|0,cy=r()*TS|0,rad=1.5+Math.pow(r(),3)*8;
+    wrapAdd(cx,cy,rad,rad*1.6,(p,q)=>{const e=Math.exp(-q*q*2.2*2.25);h[p]+=.55*rad*e;al[p]+=.05*e})}
+  const h0=h,a0=new Uint8Array(N);for(let i=0;i<N;i++)a0[i]=clamp((.5+al[i])*255,15,245);
+  hL.push(h0);aL.push(a0);
+  for(let l=1;l<NLV;l++){const sz=TS>>l,ps=sz*2,ph=hL[l-1],pa=aL[l-1],nh=new Float32Array(sz*sz),na=new Uint8Array(sz*sz);
+    for(let y=0;y<sz;y++)for(let x=0;x<sz;x++){const i=(y*2)*ps+x*2;nh[y*sz+x]=(ph[i]+ph[i+1]+ph[i+ps]+ph[i+ps+1])/4;na[y*sz+x]=(pa[i]+pa[i+1]+pa[i+ps]+pa[i+ps+1])>>2}
+    hL.push(nh);aL.push(na)}
+})();
+const gcv=document.createElement('canvas'),gctx=gcv.getContext('2d');let gImg=null,g32=null;
+function groundAt(R,sx,sy){const X=(sx-W/2)/focal,Y=(H/2-sy)/focal;return X*R[3]+Y*R[4]-R[5]<-1e-3}
+let oLam=0,oA=0;
+function samp(li,u,v,sx,sy,sz){
+  const size=TS>>li,msk=size-1,sc=size/TILE,tx=Math.floor(u*sc)&msk,ty=Math.floor(v*sc)&msk,idx=ty*size+tx,hh=hL[li],st=1<<li;
+  const gx=(hh[ty*size+((tx+1)&msk)]-hh[idx])/st,gz=(hh[((ty+1)&msk)*size+tx]-hh[idx])/st;
+  oLam=(-gx*sx+sy-gz*sz)/Math.sqrt(1+gx*gx+gz*gz);oA=aL[li][idx]/255;
+}
+// terrain is self-similar: layer n is the same map at 16^n x scale (n=-2..4), so zooming in/out never runs out of detail
+const PW=[];for(let n=-2;n<=5;n++)PW[n+2]=Math.pow(16,-n);
+function layer(n,u,v,rr,sx,sy,sz){
+  const pw=PW[n+2],uu=u*pw+137.3*n,vv=v*pw+61.7*n,lf=rr<0?0:rr>NLV-1.01?NLV-1.01:rr,l0=lf|0,fr=lf-l0;
+  samp(l0,uu,vv,sx,sy,sz);
+  if(fr>.03){const l1=oLam,a1=oA;samp(l0+1,uu,vv,sx,sy,sz);oLam=l1+(oLam-l1)*fr;oA=a1+(oA-a1)*fr}
+}
+function drawGround(R,sunV,quality,hc,cx,cz){
+  const gs=Math.max(1.5,Math.sqrt(W*H/(90000*quality))),gw=Math.ceil(W/gs),gh=Math.ceil(H/gs);
+  if(!gImg||gImg.width!==gw||gImg.height!==gh){gcv.width=gw;gcv.height=gh;gImg=gctx.createImageData(gw,gh);g32=new Uint32Array(gImg.data.buffer)}
+  const sx=sunV[0],sy=sunV[1],sz=sunV[2],expo=.72/Math.max(.22,sy),texM=TILE/TS,inv=1/(focal);
+  const R00=R[0],R01=R[1],R02=R[2],R10=R[3],R11=R[4],R12=R[5],R20=R[6],R21=R[7],R22=R[8];
+  for(let j=0;j<gh;j++){
+    const Y=(H/2-(j+.5)*gs)*inv;let q=j*gw;
+    for(let i=0;i<gw;i++,q++){
+      const X=((i+.5)*gs-W/2)*inv,ry=X*R10+Y*R11-R12;
+      if(ry>-1e-3){g32[q]=0;continue}
+      const rx=X*R00+Y*R01-R02,rz=X*R20+Y*R21-R22,t=hc/-ry,u=cx+t*rx,v=cz+t*rz;
+      const lf0=Math.log2(gs*hc/(focal*ry*ry)/texM);
+      let n=Math.floor(lf0/4);n=n<-2?-2:n>4?4:n;
+      const r=lf0-4*n;
+      layer(n,u,v,r,sx,sy,sz);let lam=oLam,a=oA;
+      if(r>3&&n<4){const w=r>4?1:r-3;layer(n+1,u,v,0,sx,sy,sz);lam+=(oLam-lam)*w;a+=(oA-a)*w}
+      const ff=(lf0-20)/3;if(ff>0){const w=ff>1?1:ff;lam+=(sy-lam)*w;a+=(.5-a)*w}
+      const L=Math.sqrt(X*X+Y*Y+1),cph=-(rx*sx+ry*sy+rz*sz)/L;
+      let surge=1;if(cph>0){const c2=cph*cph;surge=1+.6*c2*c2*c2}
+      const xx=((lam>0?lam:0)*expo+.012)*a*surge,val=255*(1-Math.exp(-1.6*xx));
+      g32[q]=0xFF000000|((val*.92)<<16)|((val*.97)<<8)|val;
+    }
+  }
+  gctx.putImageData(gImg,0,0);
+  ctx.imageSmoothingEnabled=true;ctx.drawImage(gcv,0,0,W,H);
+}
+
+// ---------- camera + keying ----------
+const kc=document.createElement('canvas'),kx=kc.getContext('2d',{willReadFrequently:true});
+let camOn=false,stream=null,bbox=null,pick=null,refData=null,capRef=false,refKW=0;
+function coverRect(sw,sh){const s=Math.max(W/sw,H/sh);return{s,dx:(W-sw*s)/2,dy:(H-sh*s)/2}}
+function processVideo(lightX,cosL){
+  const vw=vid.videoWidth,vh=vid.videoHeight;if(!vw||vid.readyState<2)return null;
+  const kw=480,kh=Math.round(kw*vh/vw);if(kc.width!==kw||kc.height!==kh){kc.width=kw;kc.height=kh;refData=null}
+  const raw=S.track&&!trackStep(vw,vh,kw,kh);
+  kx.drawImage(vid,0,0,kw,kh);
+  const im=kx.getImageData(0,0,kw,kh),d=im.data;
+  if(capRef){refData=new Uint8ClampedArray(d);capRef=false;$('hint').style.display='none'}
+  if(pick){const cr=coverRect(kw,kh);const px=Math.round((pick.x-cr.dx)/cr.s),py=Math.round((pick.y-cr.dy)/cr.s);
+    let r=0,g=0,b=0,n=0;for(let yy=py-3;yy<=py+3;yy++)for(let xx=px-3;xx<=px+3;xx++){if(xx<0||yy<0||xx>=kw||yy>=kh)continue;const i=(yy*kw+xx)*4;r+=d[i];g+=d[i+1];b+=d[i+2];n++}
+    if(n){S.key=[r/n,g/n,b/n];S.keyOn=true;S.diff=false;setKeyUI('pick')}pick=null}
+  const [kr,kg,kb]=S.key,tol=S.tol,soft=S.soft,con=S.con;
+  const diffMode=S.diff,ref=refData,kCb=-.169*kr-.331*kg+.5*kb,kCr=.5*kr-.419*kg-.081*kb;
+  const chroma=Math.max(kr,kg,kb)-Math.min(kr,kg,kb)>60,dom=kg>=kr&&kg>=kb?1:(kb>=kr?2:0);
+  const col=new Uint16Array(kw),row=new Uint16Array(kh);
+  for(let y=0,i=0;y<kh;y++){
+    for(let x=0;x<kw;x++,i+=4){
+      let r=d[i],g=d[i+1],b=d[i+2],a=255;
+      if(S.keyOn&&!S.track){let dist;
+        if(diffMode){if(ref){const dr=r-ref[i],dg=g-ref[i+1],db=b-ref[i+2];dist=Math.sqrt(dr*dr+dg*dg+db*db)*.2264}else dist=0}
+        else if(chroma){ // chrominance distance: ignores brightness, so grey/white objects stay opaque
+          const cb=-.169*r-.331*g+.5*b,cr=.5*r-.419*g-.081*b,dcb=cb-kCb,dcr=cr-kCr;dist=Math.sqrt(dcb*dcb+dcr*dcr)*.78}
+        else{const dr=r-kr,dg=g-kg,db=b-kb;dist=Math.sqrt(dr*dr+dg*dg+db*db)*.2264}
+        if(dist<=tol)a=0;else if(dist<tol+soft){const t=(dist-tol)/soft;a=t*t*(3-2*t)*255|0}}
+      if(a>0){
+        if(S.keyOn&&!S.track&&chroma&&!diffMode){ // spill suppression
+          const o=dom===1?Math.max(r,b):dom===2?Math.max(r,g):Math.max(g,b);
+          if(dom===1&&g>o)g=o+(g-o)*.15;else if(dom===2&&b>o)b=o+(b-o)*.15;else if(dom===0&&r>o)r=o+(r-o)*.15}
+        if(S.render&&!raw){
+          const lit=.62+lightX*(x/kw-.5)*1.3-(cosL>0?.1*cosL:0),m=.55+.75*lit;
+          r=((r-128)*con+128)*m*1.04;g=((g-128)*con+128)*m;b=((b-128)*con+128)*m*.94;
+          d[i]=r<0?0:r>255?255:r;d[i+1]=g<0?0:g>255?255:g;d[i+2]=b<0?0:b>255?255:b;
+        }else{d[i]=r;d[i+1]=g;d[i+2]=b}
+        if(a>200){col[x]++;row[y]++}
+      }
+      d[i+3]=a;
+    }
+  }
+  kx.putImageData(im,0,0);
+  if(S.track&&TG){kx.globalCompositeOperation='destination-in';kx.drawImage(mcv,0,0,kw,kh);kx.globalCompositeOperation='source-over'}
+  let x0=-1,x1=-1,y0=-1,y1=-1;
+  for(let x=0;x<kw;x++)if(col[x]>=4){if(x0<0)x0=x;x1=x}
+  for(let y=0;y<kh;y++)if(row[y]>=4){if(y0<0)y0=y;y1=y}
+  if(S.keyOn&&x0>=0&&x1-x0>12&&y1-y0>12){const nb={x0,x1,y1};
+    if(!bbox)bbox=nb;else{for(const k in nb)bbox[k]+=(nb[k]-bbox[k])*.3}}
+  else if(!S.keyOn||x0<0)bbox=null;
+  if(S.track){if(TG&&tgLost<=6){const nb={x0:TG.box.x0*kw/MW,x1:(TG.box.x1+1)*kw/MW,y1:(TG.box.y1+1)*kh/MH};if(!bbox)bbox=nb;else for(const k in nb)bbox[k]+=(nb[k]-bbox[k])*.4}else bbox=null}
+  return{kw,kh,raw};
+}
+
+
+// ---------- tap-to-select object tracking ----------
+const MW=240;let MH=180;
+const sc0=document.createElement('canvas'),sxc=sc0.getContext('2d',{willReadFrequently:true});
+const mcv=document.createElement('canvas'),mxc=mcv.getContext('2d');
+let needRef=false,objRef=null,TG=null,tapReq=null,tgLost=0,Aal=null,maskImg=null,hintShown=false,hintTxt='';
+const NB=4096,EPS=2e-4,binOf=(r,g,b)=>((r>>4)<<8)|((g>>4)<<4)|(b>>4);
+const expandBox=(b,f)=>{const mx=Math.max(10,(b.x1-b.x0)*f),my=Math.max(10,(b.y1-b.y0)*f);
+  return{x0:Math.max(0,Math.floor(b.x0-mx)),y0:Math.max(0,Math.floor(b.y0-my)),x1:Math.min(MW-1,Math.ceil(b.x1+mx)),y1:Math.min(MH-1,Math.ceil(b.y1+my))}};
+function growSeed(d,sx,sy,tol){
+  let r=0,g=0,b=0,n=0;
+  for(let y=sy-2;y<=sy+2;y++)for(let x=sx-2;x<=sx+2;x++){if(x<0||y<0||x>=MW||y>=MH)continue;const i=(y*MW+x)*4;r+=d[i];g+=d[i+1];b+=d[i+2];n++}
+  r/=n;g/=n;b/=n;const t2=tol*tol,N=MW*MH,m=new Uint8Array(N),st=new Int32Array(N);let sp=0,cnt=0,leak=false;
+  const ok=p=>{const i=p*4,dr=d[i]-r,dg=d[i+1]-g,db=d[i+2]-b;return dr*dr+dg*dg+db*db<=t2};
+  const s0=sy*MW+sx;m[s0]=1;st[sp++]=s0;
+  while(sp){const c=st[--sp];cnt++;if(cnt>N*.4){leak=true;break}
+    const cx=c%MW,cy=(c/MW)|0;
+    if(cx>0&&!m[c-1]&&ok(c-1)){m[c-1]=1;st[sp++]=c-1}
+    if(cx<MW-1&&!m[c+1]&&ok(c+1)){m[c+1]=1;st[sp++]=c+1}
+    if(cy>0&&!m[c-MW]&&ok(c-MW)){m[c-MW]=1;st[sp++]=c-MW}
+    if(cy<MH-1&&!m[c+MW]&&ok(c+MW)){m[c+MW]=1;st[sp++]=c+MW}}
+  return{m,cnt,leak};
+}
+function boxOf(m){let x0=MW,y0=MH,x1=-1,y1=-1,a=0;
+  for(let y=0,p=0;y<MH;y++)for(let x=0;x<MW;x++,p++)if(m[p]){a++;if(x<x0)x0=x;if(x>x1)x1=x;if(y<y0)y0=y;if(y>y1)y1=y}
+  return{x0,y0,x1,y1,area:a}}
+function histMask(d,m,core){const h=new Float32Array(NB);let n=0;
+  for(let y=1;y<MH-1;y++)for(let x=1;x<MW-1;x++){const p=y*MW+x;
+    if(!m[p])continue;if(core&&!(m[p-1]&&m[p+1]&&m[p-MW]&&m[p+MW]))continue;
+    const i=p*4;h[binOf(d[i],d[i+1],d[i+2])]++;n++}
+  if(n)for(let k=0;k<NB;k++)h[k]/=n;return h}
+function histOut(d,box){ // background model: the frame's outer band (the object is assumed to be near the middle)
+  const e=expandBox(box,.2),h=new Float32Array(NB),bx=MW*.12,by=MH*.12;let n=0;
+  for(let y=0;y<MH;y+=2)for(let x=0;x<MW;x+=2){if(x>=bx&&x<=MW-bx&&y>=by&&y<=MH-by)continue;
+    if(x>=e.x0&&x<=e.x1&&y>=e.y0&&y<=e.y1)continue;
+    const i=(y*MW+x)*4;h[binOf(d[i],d[i+1],d[i+2])]++;n++}
+  if(n)for(let k=0;k<NB;k++)h[k]/=n;return h}
+function fillHoles(out,box){
+  const ox=box.x0-1,oy=box.y0-1,bw=box.x1-box.x0+3,bh=box.y1-box.y0+3,out2=new Uint8Array(bw*bh),st=[];
+  const isFg=(lx,ly)=>{const gx=ox+lx,gy=oy+ly;return gx>=0&&gy>=0&&gx<MW&&gy<MH&&out[gy*MW+gx]===1};
+  const push=(lx,ly)=>{const k=ly*bw+lx;if(!out2[k]&&!isFg(lx,ly)){out2[k]=1;st.push(k)}};
+  for(let x=0;x<bw;x++){push(x,0);push(x,bh-1)}for(let y=0;y<bh;y++){push(0,y);push(bw-1,y)}
+  while(st.length){const k=st.pop(),lx=k%bw,ly=(k/bw)|0;
+    if(lx>0)push(lx-1,ly);if(lx<bw-1)push(lx+1,ly);if(ly>0)push(lx,ly-1);if(ly<bh-1)push(lx,ly+1)}
+  for(let ly=1;ly<bh-1;ly++)for(let lx=1;lx<bw-1;lx++){if(!out2[ly*bw+lx]){const gx=ox+lx,gy=oy+ly;if(gx>=0&&gy>=0&&gx<MW&&gy<MH)out[gy*MW+gx]=1}}
+}
+function classify(d,win,thr,prev,novel){
+  const N=MW*MH,m=new Uint8Array(N),f=TG.fg,bgh=TG.bg;
+  for(let y=win.y0;y<=win.y1;y++){let p=y*MW+win.x0;for(let x=win.x0;x<=win.x1;x++,p++){
+    const i=p*4,k=binOf(d[i],d[i+1],d[i+2]),pf=f[k];if((pf+EPS)/(pf+bgh[k]+2*EPS)>thr||(novel&&bgh[k]<2e-4))m[p]=1}}
+  const vis=new Uint8Array(N),q=new Int32Array(N);let best=null,bs=-1;
+  for(let y=win.y0;y<=win.y1;y++)for(let x=win.x0;x<=win.x1;x++){const p0=y*MW+x;if(!m[p0]||vis[p0])continue;
+    let h=0,t=0,ov=0;q[t++]=p0;vis[p0]=1;
+    while(h<t){const c=q[h++];if(prev[c])ov++;const cx=c%MW,cy=(c/MW)|0;
+      if(cx>0&&m[c-1]&&!vis[c-1]){vis[c-1]=1;q[t++]=c-1}
+      if(cx<MW-1&&m[c+1]&&!vis[c+1]){vis[c+1]=1;q[t++]=c+1}
+      if(cy>0&&m[c-MW]&&!vis[c-MW]){vis[c-MW]=1;q[t++]=c-MW}
+      if(cy<MH-1&&m[c+MW]&&!vis[c+MW]){vis[c+MW]=1;q[t++]=c+MW}}
+    const scr=ov*4+t;if(scr>bs){bs=scr;best=q.slice(0,t)}}
+  if(!best)return null;
+  const out=new Uint8Array(N);let x0=MW,y0=MH,x1=0,y1=0;
+  for(let j=0;j<best.length;j++){const c=best[j];out[c]=1;const cx=c%MW,cy=(c/MW)|0;if(cx<x0)x0=cx;if(cx>x1)x1=cx;if(cy<y0)y0=cy;if(cy>y1)y1=cy}
+  const box={x0,y0,x1,y1};fillHoles(out,box);
+  let area=0;for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++)if(out[y*MW+x])area++;
+  return{m:out,box,area};
+}
+function refine(d,mask){
+  let box=boxOf(mask);TG={mask,box,area:box.area,area0:box.area,fg:histMask(d,mask,false),bg:histOut(d,box),n:0};
+  for(let k=0;k<3;k++){
+    const r=classify(d,expandBox(TG.box,.35),.6,TG.mask,true);if(!r||r.area<10||r.area>TG.area*8)break;
+    TG.mask=r.m;TG.box=r.box;TG.area=r.area;TG.fg=histMask(d,r.m,false);TG.bg=histOut(d,r.box)}
+  TG.area0=TG.area;tgLost=0;Aal=null;
+}
+function startTarget(d,sx,sy){
+  sx=clamp(sx|0,2,MW-3);sy=clamp(sy|0,2,MH-3);
+  let tol=38,res=null;
+  for(let a=0;a<5;a++){res=growSeed(d,sx,sy,tol);if(res.leak)tol*=.65;else if(res.cnt<25)tol*=1.5;else break}
+  let mask=res.m,adding=false;
+  if(TG){const e=expandBox(TG.box,.5);
+    if(sx>=e.x0&&sx<=e.x1&&sy>=e.y0&&sy<=e.y1){adding=true;for(let p=0;p<mask.length;p++)if(TG.mask[p])mask[p]=1}} // tap near target = add another part
+  refine(d,mask);if(!adding)needRef=true;
+}
+function trackFrame(d){
+  const full=tgLost>6,win=full?{x0:0,y0:0,x1:MW-1,y1:MH-1}:expandBox(TG.box,.5);
+  const ref=full?TG.area0:TG.area,lo=full?.3:.4,hi=full?3:2.5;
+  let r=classify(d,win,full?.8:.6,TG.mask);
+  if(r&&r.area>ref*hi&&!full){const r2=classify(d,win,.85,TG.mask);if(r2)r=r2}
+  if(r&&r.area>=Math.max(12,ref*lo)&&r.area<=ref*hi){
+    TG.mask=r.m;TG.box=r.box;TG.area=TG.area*.7+r.area*.3;tgLost=0;
+    if(++TG.n%8===0){const nf=histMask(d,r.m,true),nb=histOut(d,r.box);
+      for(let k=0;k<NB;k++){TG.fg[k]=TG.fg[k]*.95+nf[k]*.05;TG.bg[k]=TG.bg[k]*.95+nb[k]*.05}}
+  }else tgLost++;
+}
+function writeMask(){
+  const N=MW*MH;if(!Aal)Aal=new Float32Array(N);
+  const tgt=(TG&&tgLost<=6)?TG.mask:null;
+  for(let p=0;p<N;p++)Aal[p]=Aal[p]*.45+(tgt&&tgt[p]?.55:0);
+  if(!maskImg||maskImg.width!==MW||maskImg.height!==MH)maskImg=mxc.createImageData(MW,MH);
+  const o=maskImg.data;
+  for(let y=0;y<MH;y++)for(let x=0;x<MW;x++){const i=(y*MW+x)*4;
+    if(x===0||y===0||x===MW-1||y===MH-1){o[i+3]=0;continue}
+    const p=y*MW+x,a=(Aal[p-MW-1]+Aal[p-MW]+Aal[p-MW+1]+Aal[p-1]+Aal[p]+Aal[p+1]+Aal[p+MW-1]+Aal[p+MW]+Aal[p+MW+1])/9,v=(a-.5)*1.6+.5;
+    o[i]=o[i+1]=o[i+2]=255;o[i+3]=v<=0?0:v>=1?255:v*255}
+  mxc.putImageData(maskImg,0,0);
+}
+function trackStep(vw,vh,kw,kh){ // returns true when a target exists
+  const mh=Math.round(MW*vh/vw);
+  if(mh!==MH||sc0.width!==MW){MH=mh;sc0.width=mcv.width=MW;sc0.height=mcv.height=MH;TG=null;Aal=null;maskImg=null}
+  if(!TG&&!tapReq)return false;
+  sxc.drawImage(vid,0,0,MW,MH);const d=sxc.getImageData(0,0,MW,MH).data;
+  if(tapReq){const cr=coverRect(MW,MH);startTarget(d,(tapReq.x-cr.dx)/cr.s,(tapReq.y-cr.dy)/cr.s);tapReq=null}
+  else if(TG)trackFrame(d);
+  if(TG)writeMask();
+  return !!TG;
+}
+function updateHint(){
+  const h=$('hint');
+  if(!camOn||!S.track){if(hintShown){h.style.display='none';hintShown=false}return}
+  let t=null;
+  if(!TG)t='撮影したいもの(模型)をタップしてください';
+  else if(tgLost>6)t='対象を見失いました。もう一度ものをタップしてください';
+  if(t){if(t!==hintTxt||!hintShown){h.textContent=t;h.style.display='';hintTxt=t}hintShown=true}
+  else if(hintShown){h.style.display='none';hintShown=false;hintTxt=''}
+}
+$('untrack').onclick=()=>{TG=null;tgLost=0;Aal=null;bbox=null;objRef=null;needRef=false};
+
+// ---------- view control (gyro = full 3D attitude incl. roll; manual = yaw/pitch) ----------
+let hBase=1.5,camH=1.5,camX=0,camZ=0,sSm=1,Tsm=[0,0,0],yawT=0,pitchT=-12,yawOff=0,gyroOn=false,ori=null,needZero=false,Rcur=rotX(-12*D2R),quality=1;
+const VIEWS={ground:[0,-32],horizon:[0,-3],earth:[S.earthAz,S.earthEl-4],sky:[S.earthAz-60,55]};
+const fmtAlt=h=>h<10?h.toFixed(2)+' m':h<100?h.toFixed(1)+' m':Math.round(h)+' m';
+const manualMat=()=>mmul(rotY(-yawT*D2R),rotX(pitchT*D2R));
+function devMat(){
+  const o=ori,ang=(screen.orientation&&typeof screen.orientation.angle==='number')?screen.orientation.angle:(window.orientation||0);
+  return mmul(mmul(mmul(mmul(rotY(o.a*D2R),rotX(o.b*D2R)),rotZ(-o.g*D2R)),rotX(-Math.PI/2)),rotZ(-ang*D2R));
+}
+function onOri(e){if(e.beta==null)return;ori={a:e.alpha||0,b:e.beta,g:e.gamma||0}}
+async function toggleGyro(){
+  if(gyroOn){gyroOn=false;removeEventListener('deviceorientation',onOri);$('gyro').classList.remove('on');
+    yawT=fwdAz(Rcur);pitchT=fwdEl(Rcur);return}
+  try{if(window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission){if(await DeviceOrientationEvent.requestPermission()!=='granted')return}}
+  catch(e){alert('モーションセンサーの許可が必要です');return}
+  ori=null;needZero=true;gyroOn=true;addEventListener('deviceorientation',onOri);$('gyro').classList.add('on');
+}
+$('gyro').onclick=toggleGyro;
+$('zero').onclick=()=>{if(gyroOn)needZero=true;else{yawT=0}};
+document.querySelectorAll('#presets [data-v]').forEach(b=>b.onclick=async()=>{
+  const k=b.dataset.v,v=VIEWS[k];
+  if(gyroOn){if(k==='earth'){yawOff+=wrap(S.earthAz-fwdAz(Rcur));return}await toggleGyro()}
+  yawT=v[0];pitchT=v[1]});
+let drag=null,pinchD=0,pinched=false;const ptrs=new Map();
+function setAlt(h){hBase=clamp(h,.15,300);const v=Math.round(Math.log10(hBase/.3)/2.8*100);$('alt').value=v;$('altv').textContent=fmtAlt(hBase)}
+cv.addEventListener('pointerdown',e=>{cv.setPointerCapture(e.pointerId);ptrs.set(e.pointerId,[e.clientX,e.clientY]);
+  if(ptrs.size===2){const [a,b]=[...ptrs.values()];pinchD=Math.hypot(a[0]-b[0],a[1]-b[1]);pinched=true;drag=null}
+  else if(ptrs.size===1){pinched=false;drag={x:e.clientX,y:e.clientY,sx:e.clientX,sy:e.clientY,moved:false}}});
+cv.addEventListener('pointermove',e=>{
+  if(!ptrs.has(e.pointerId))return;ptrs.set(e.pointerId,[e.clientX,e.clientY]);
+  if(ptrs.size===2){const [a,b]=[...ptrs.values()],d=Math.hypot(a[0]-b[0],a[1]-b[1]);
+    if(pinchD>10&&d>10){setAlt(hBase*pinchD/d)} // pinch out = move closer to the surface
+    pinchD=d;return}
+  if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;drag.x=e.clientX;drag.y=e.clientY;
+  if(Math.hypot(e.clientX-drag.sx,e.clientY-drag.sy)>8)drag.moved=true;
+  if(drag.moved){const dpp=65/Math.max(W,H);
+    if(gyroOn)yawOff-=dx*dpp;else{yawT-=dx*dpp;pitchT=clamp(pitchT+dy*dpp,-89,89)}}});
+const upFn=e=>{const had=ptrs.delete(e.pointerId);
+  if(had&&!pinched&&drag&&!drag.moved&&e.type==='pointerup'){
+    if(armPick){pick={x:e.clientX,y:e.clientY};armPick=false;$('hint').style.display='none'}
+    else if(S.track&&camOn)tapReq={x:e.clientX,y:e.clientY}}
+  if(ptrs.size===0){drag=null}};
+cv.addEventListener('pointerup',upFn);cv.addEventListener('pointercancel',upFn);
+
+// ---------- main loop ----------
+let t0=performance.now();
+function frame(){
+  requestAnimationFrame(frame);
+  let Rt,Rd=null;
+  focal=Math.max(W,H)/2/Math.tan(S.fov*D2R/2);
+  if(gyroOn&&ori){Rd=devMat();
+    if(needZero){yawOff=-fwdAz(Rd);needZero=false}
+    Rt=mmul(rotY(-yawOff*D2R),Rd)}
+  else Rt=manualMat();
+  const k=gyroOn&&ori?.5:.25;
+  Rcur=orth(Rcur.map((v,i)=>v+(Rt[i]-v)*k));
+  const R=Rcur;
+  const sunV=dirVec(S.sunAz,S.sunEl),sc=toCam(R,sunV),lightX=sc[0],cosL=-sc[2];
+  ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
+  let dim=null;
+  if(camOn)dim=processVideo(lightX,cosL);
+  // ---- virtual camera position from the real camera's motion relative to the tapped object ----
+  if(!(S.dist>0))S.dist=.6;
+  if(camOn&&dim&&S.track&&TG&&tgLost<=6){
+    const cr=coverRect(dim.kw,dim.kh),size=Math.sqrt(TG.area)/MW,ocx=(TG.box.x0+TG.box.x1+1)/2/MW,ocy=(TG.box.y0+TG.box.y1+1)/2/MH;
+    const spx=cr.dx+ocx*dim.kw*cr.s,spy=cr.dy+ocy*dim.kh*cr.s;
+    if(needRef||!objRef){objRef={size,d:null};needRef=false;sSm=1;Tsm=[0,0,0]}
+    const sr=clamp(objRef.size/size,.2,5);sSm+=(sr-sSm)*.2; // >1: device moved away from the object
+    let T=[0,0,0];
+    if(Rd){const x=(spx-W/2)/focal,y=(H/2-spy)/focal,l=Math.hypot(x,y,1);
+      const dv=[(Rd[0]*x+Rd[1]*y-Rd[2])/l,(Rd[3]*x+Rd[4]*y-Rd[5])/l,(Rd[6]*x+Rd[7]*y-Rd[8])/l];
+      if(!objRef.d)objRef.d=dv;
+      T=[S.dist*(objRef.d[0]-sSm*dv[0]),S.dist*(objRef.d[1]-sSm*dv[1]),S.dist*(objRef.d[2]-sSm*dv[2])];
+      const Tr=mmul(rotY(-yawOff*D2R),[1,0,0,0,1,0,0,0,1]);T=[Tr[0]*T[0]+Tr[1]*T[1]+Tr[2]*T[2],Tr[3]*T[0]+Tr[4]*T[1]+Tr[5]*T[2],Tr[6]*T[0]+Tr[7]*T[1]+Tr[8]*T[2]]}
+    for(let i=0;i<3;i++)Tsm[i]+=(T[i]-Tsm[i])*.25;
+  }else if(!Rd){for(let i=0;i<3;i++)Tsm[i]*=.95}
+  {const hT=clamp(hBase*Math.pow(sSm,S.k)+S.gain*Tsm[1],.05,500);
+   camH+=(hT-camH)*.3;camX+=(S.gain*Tsm[0]-camX)*.3;camZ+=(S.gain*Tsm[2]-camZ)*.3}
+  if(camOn&&dim&&(!S.render||dim.raw)){const cr=coverRect(dim.kw,dim.kh);ctx.drawImage(kc,cr.dx,cr.dy,dim.kw*cr.s,dim.kh*cr.s)}
+  else{
+    drawStars(R);
+    drawEarth(R,sunV);
+    const sunIn=drawSun(R,sunV);
+    drawGround(R,sunV,quality,camH,camX,camZ);
+    const v=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*.35,W/2,H/2,Math.max(W,H)*.75);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(0,0,0,.4)');
+    ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
+    if(sunIn){ctx.fillStyle='rgba(255,245,225,.05)';ctx.fillRect(0,0,W,H)}
+    if(camOn&&dim){
+      const cr=coverRect(dim.kw,dim.kh);
+      if(bbox){
+        const bw=(bbox.x1-bbox.x0)*cr.s,cx=cr.dx+(bbox.x0+bbox.x1)/2*cr.s,by=cr.dy+bbox.y1*cr.s;
+        if(groundAt(R,cx,by-2)){
+          ctx.save();const rx=bw*(.55+.45*Math.abs(lightX)),ry=Math.max(6,bw*.1);
+          ctx.translate(cx-lightX*bw*.5,by);ctx.scale(1,ry/rx);
+          const g=ctx.createRadialGradient(0,0,0,0,0,rx);g.addColorStop(0,'rgba(0,0,0,.85)');g.addColorStop(.6,'rgba(0,0,0,.55)');g.addColorStop(1,'rgba(0,0,0,0)');
+          ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,rx,0,7);ctx.fill();ctx.restore();
+        }
+      }
+      ctx.drawImage(kc,cr.dx,cr.dy,dim.kw*cr.s,dim.kh*cr.s);
+    }
+  }
+  updateHint();
+  const now=performance.now();
+  if(now-t0>250){t0=now;$('status').textContent=`方位 ${((fwdAz(R)%360)+360)%360|0}° / 仰角 ${fwdEl(R)|0}°`+` / 高度 ${fmtAlt(camH)}`+(gyroOn?' 🧭':'')}
+}
+requestAnimationFrame(frame);
+
+// ---------- camera ----------
+async function startCam(){
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    alert('カメラを使うには HTTPS で開く必要があります(https:// の URL でアクセスしてください)。');return}
+  try{
+    if(stream)stream.getTracks().forEach(t=>t.stop());
+    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:S.facing},width:{ideal:1280},height:{ideal:720}},audio:false});
+    vid.srcObject=stream;await vid.play();camOn=true;
+    $('cam').innerHTML='⏹<br>カメラ停止';$('cam').classList.add('red');$('hint').style.display='none';
+    try{if(navigator.wakeLock)navigator.wakeLock.request('screen')}catch(e){}
+  }catch(e){alert('カメラを起動できませんでした: '+e.message)}
+}
+function stopCam(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;camOn=false;bbox=null;
+  $('cam').innerHTML='📷<br>撮影開始';$('cam').classList.remove('red');$('hint').style.display=''}
+$('cam').onclick=()=>camOn?stopCam():startCam();
+$('flip').onclick=()=>{S.facing=S.facing==='environment'?'user':'environment';if(camOn)startCam()};
+$('fx').onclick=e=>{S.render=!S.render;$('fx').classList.toggle('on',S.render)};
+$('cfg').onclick=()=>{const p=$('panel');p.style.display=p.style.display==='block'?'none':'block'};
+
+// ---------- settings ----------
+function bind(id,key,fmt,scale=1){const el=$(id),out=$(id+'v');const f=()=>{S[key]=el.value*scale;out.textContent=fmt(el.value)};el.oninput=f;f()}
+bind('tol','tol',v=>v);bind('soft','soft',v=>v);bind('sun','sunAz',v=>v+'°');bind('con','con',v=>(v/100).toFixed(2),.01);
+bind('earth','earthSize',v=>v+'°');bind('sunel','sunEl',v=>v+'°');bind('kk','k',v=>(v/100).toFixed(2),.01);bind('gain','gain',v=>v+'×');bind('dist','dist',v=>v+'cm',.01);
+$('alt').oninput=()=>{hBase=.3*Math.pow(10,$('alt').value/100*2.8);$('altv').textContent=fmtAlt(hBase)};$('alt').oninput();bind('fov','fov',v=>v+'°');
+$('qual').oninput=()=>{quality=$('qual').value/100;$('qualv').textContent=$('qual').value+'%'};$('qual').oninput();bind('stars','stars',v=>v+'%',.01);
+const PRESET={green:[0,177,64],blue:[0,71,187],black:[0,0,0],white:[255,255,255]};
+let armPick=false;
+function setKeyUI(k){document.querySelectorAll('#keychips [data-k]').forEach(b=>b.classList.toggle('on',b.dataset.k===k));
+  $('sw').style.background=(S.keyOn&&!S.diff&&!S.track)?`rgb(${S.key.map(Math.round)})`:'transparent'}
+document.querySelectorAll('#keychips [data-k]').forEach(b=>b.onclick=()=>{
+  const k=b.dataset.k;
+  if(k==='track'){S.track=true;S.diff=false;S.keyOn=true;setKeyUI(k)}
+  else if(k==='off'){S.track=false;S.keyOn=false;S.diff=false;setKeyUI(k)}
+  else if(k==='diff'){if(!camOn){alert('先にカメラを起動してください');return}
+    $('panel').style.display='none';S.track=false;S.diff=true;S.keyOn=true;S.tol=14;S.soft=12;$('tol').value=14;$('soft').value=12;$('tolv').textContent=14;$('softv').textContent=12;
+    $('hint').style.display='';$('hint').textContent='ものを置かずに背景だけ映し、端末を固定してください。3秒後に背景を登録します。';
+    setTimeout(()=>{capRef=true;setKeyUI('diff')},3000)}
+  else if(k==='pick'){if(!camOn){alert('先にカメラを起動してください');return}armPick=true;S.track=false;S.keyOn=true;$('panel').style.display='none';
+    $('hint').style.display='';$('hint').textContent='消したい背景の色の部分をタップしてください';setTimeout(()=>{if(!armPick)$('hint').style.display='none'},0)}
+  else{S.key=PRESET[k].slice();S.track=false;S.keyOn=true;S.diff=false;setKeyUI(k)}
+});
+setKeyUI('track');
+
+// ---------- save photo / video ----------
+const modal=$('modal');let cur=null;
+const stamp=()=>{const d=new Date(),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`};
+function showResult(blob,name,isVideo){
+  const url=URL.createObjectURL(blob);cur={blob,name,url};
+  const box=$('mediabox');box.innerHTML='';
+  const el=document.createElement(isVideo?'video':'img');el.src=url;if(isVideo){el.controls=true;el.playsInline=true;el.muted=true;el.loop=true}
+  box.appendChild(el);
+  $('mhint').textContent=isVideo?'「保存 / 共有」から「ビデオを保存」を選んでください。':'「保存 / 共有」→「画像を保存」を選ぶか、画像を長押しして保存してください。';
+  modal.style.display='flex';
+}
+$('snap').onclick=()=>{
+  cv.toBlob(b=>{if(b)showResult(b,`lunar-${stamp()}.png`,false)},'image/png');
+};
+$('mclose').onclick=()=>{modal.style.display='none';$('mediabox').innerHTML='';if(cur){URL.revokeObjectURL(cur.url);cur=null}};
+$('mshare').onclick=async()=>{
+  if(!cur)return;const file=new File([cur.blob],cur.name,{type:cur.blob.type});
+  try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:'Lunar Cam'});return}}catch(e){if(e.name==='AbortError')return}
+  const a=document.createElement('a');a.href=cur.url;a.download=cur.name;document.body.appendChild(a);a.click();a.remove();
+};
+let rec=null,chunks=[],recT=0,recTimer=null;
+$('recbtn').onclick=()=>{
+  if(rec){rec.stop();return}
+  if(!window.MediaRecorder||!cv.captureStream){alert('このブラウザは画面録画に対応していません(写真保存をご利用ください)');return}
+  const mt=['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+  rec=new MediaRecorder(cv.captureStream(30),mt?{mimeType:mt,videoBitsPerSecond:6e6}:{});chunks=[];
+  rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
+  rec.onstop=()=>{clearInterval(recTimer);$('rec').style.display='none';$('recbtn').classList.remove('red');$('recbtn').innerHTML='⏺<br>録画';
+    const type=(rec.mimeType||mt||'video/webm').split(';')[0];const ext=type.includes('mp4')?'mp4':'webm';
+    const blob=new Blob(chunks,{type});rec=null;showResult(blob,`lunar-${stamp()}.${ext}`,true)};
+  rec.start(500);recT=Date.now();$('rec').style.display='inline';$('recbtn').classList.add('red');$('recbtn').innerHTML='⏹<br>停止';
+  recTimer=setInterval(()=>{const s=(Date.now()-recT)/1000|0;$('rec').textContent=`● REC ${String(s/60|0).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`},250);
+};
+})();
+</script>
+</body>
+</html>
