@@ -11,23 +11,51 @@
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
 html,body{margin:0;height:100%;background:#000;color:#e8ecf4;font:14px -apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif;overflow:hidden;overscroll-behavior:none}
 canvas{position:fixed;inset:0;width:100%;height:100%;touch-action:none;display:block}
-#top{position:fixed;top:0;left:0;right:0;padding:calc(env(safe-area-inset-top) + 8px) 12px 6px;display:flex;justify-content:space-between;align-items:center;pointer-events:none;font-size:12px;color:#aab4c8;text-shadow:0 1px 3px #000}
-#rec{display:none;color:#fff;background:#d22;border-radius:10px;padding:2px 8px;font-weight:600}
-#hint{position:fixed;left:16px;right:16px;top:20%;text-align:center;font-size:15px;line-height:1.6;color:#dfe6f5;text-shadow:0 1px 6px #000;pointer-events:none}
-#bottom{position:fixed;left:0;right:0;bottom:0;padding:8px 8px calc(env(safe-area-inset-bottom) + 8px);background:linear-gradient(transparent,rgba(0,0,0,.7) 35%);display:flex;flex-direction:column;gap:8px}
+button{font:inherit;color:#e8ecf4;background:rgba(40,48,70,.86);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:9px 10px;min-width:0;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);cursor:pointer}
+button:active{transform:scale(.97)}
 .row{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
-button{font:inherit;color:#e8ecf4;background:rgba(40,48,70,.82);border:1px solid rgba(255,255,255,.18);border-radius:12px;padding:9px 10px;min-width:58px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-button.main{flex:1;max-width:120px;font-weight:600}
-button.chip{padding:6px 10px;min-width:0;font-size:13px;border-radius:16px}
-button.on{background:#2f6df0;border-color:#8db1ff}
-button.red{background:#c62828}
-button:active{transform:scale(.96)}
-#panel{display:none;background:rgba(14,18,30,.92);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:10px 14px;max-height:42vh;overflow:auto;-webkit-overflow-scrolling:touch}
-#panel label{display:grid;grid-template-columns:96px 1fr 38px;align-items:center;gap:8px;margin:6px 0;font-size:13px}
-#panel input[type=range]{width:100%}
-#panel .sub{font-size:12px;color:#9aa6bd;margin:8px 0 4px}
+
+/* ---- top: title / status, mode switch, state pills ---- */
+#top{position:fixed;top:0;left:0;right:0;padding:calc(env(safe-area-inset-top) + 6px) 10px 0;display:flex;flex-direction:column;gap:6px;pointer-events:none;text-shadow:0 1px 3px #000}
+#topline{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:12px;color:#c3cce0}
+#topline small{opacity:.6}
+#rec{display:none;color:#fff;background:#d22;border-radius:10px;padding:2px 8px;font-weight:700;text-shadow:none}
+#modeseg{pointer-events:auto;display:flex;align-self:center;width:min(440px,100%);background:rgba(10,14,26,.78);border:1px solid rgba(255,255,255,.22);border-radius:16px;padding:4px;gap:4px;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+#modeseg .seg{flex:1;border:0;background:transparent;border-radius:12px;padding:11px 6px;font-size:15px;font-weight:700;color:#9aa6bd;text-shadow:none}
+#modeseg .seg.on{background:linear-gradient(#3b7bff,#2457d6);color:#fff;box-shadow:0 2px 10px rgba(47,109,240,.55)}
+#pills{display:flex;justify-content:center;flex-wrap:wrap;gap:5px}
+.pill{font-size:11px;padding:3px 9px;border-radius:11px;background:rgba(10,14,26,.7);border:1px solid rgba(255,255,255,.16);color:#9aa6bd;text-shadow:none;white-space:nowrap}
+.pill.ok{color:#bff0cf;border-color:rgba(80,200,120,.6);background:rgba(20,70,40,.6)}
+.pill.warn{color:#ffe2a8;border-color:rgba(255,190,70,.6);background:rgba(80,55,10,.6)}
+#hint{position:fixed;left:16px;right:16px;top:30%;text-align:center;font-size:15px;line-height:1.7;color:#e6ecfa;text-shadow:0 1px 6px #000;pointer-events:none}
+
+/* ---- bottom: view row, main actions, settings ---- */
+#bottom{position:fixed;left:0;right:0;bottom:0;padding:8px 8px calc(env(safe-area-inset-bottom) + 8px);background:linear-gradient(transparent,rgba(0,0,0,.78) 30%);display:flex;flex-direction:column;gap:8px}
+#viewrow{display:flex;gap:6px;align-items:center;justify-content:center;flex-wrap:wrap}
+#viewrow .lbl{font-size:11px;color:#9aa6bd;padding:0 2px}
+button.chip{padding:7px 11px;font-size:13px;border-radius:16px}
+button.chip.on,button.on{background:#2f6df0;border-color:#9dbcff;color:#fff}
+#mainrow{display:flex;gap:6px}
+button.main{flex:1;min-height:60px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:6px 2px;font-weight:700}
+button.main .ic{font-size:20px;line-height:1}
+button.main .tx{font-size:12px;line-height:1.2;text-align:center}
+button.main.go{background:#1f9d55;border-color:#7ee2a8;color:#fff}
+button.main.red{background:#c62828;border-color:#ff9a9a;color:#fff}
+button.main.on{background:#2f6df0;border-color:#9dbcff;color:#fff}
+.st{font-weight:800}
+
+/* ---- settings panel with tabs ---- */
+#panel{display:none;background:rgba(14,18,30,.94);border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:8px 12px 10px;max-height:46vh;overflow:auto;-webkit-overflow-scrolling:touch}
+#tabs{display:flex;gap:4px;position:sticky;top:0;background:rgba(14,18,30,.97);padding:2px 0 6px;z-index:1}
+#tabs .tab{flex:1;padding:8px 2px;font-size:13px;border-radius:10px}
+#panel label{display:grid;grid-template-columns:112px 1fr 44px;align-items:center;gap:8px;margin:7px 0;font-size:13px}
+#panel input[type=range]{width:100%;min-height:28px}
+#panel .sub{font-size:12px;color:#9aa6bd;margin:8px 0 4px;line-height:1.5}
 #panel .val{text-align:right;color:#9db4ff;font-variant-numeric:tabular-nums}
 #sw{display:inline-block;width:16px;height:16px;border-radius:4px;border:1px solid #fff;vertical-align:middle}
+body.person .obj-only{display:none!important}
+body:not(.person) .per-only{display:none!important}
+
 #modal{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:calc(env(safe-area-inset-top) + 12px) 12px calc(env(safe-area-inset-bottom) + 12px);z-index:10}
 #modal img,#modal video{max-width:100%;max-height:72vh;border-radius:8px;-webkit-user-select:auto;user-select:auto;-webkit-touch-callout:default}
 #modal p{margin:0;color:#aab4c8;font-size:12px;text-align:center}
@@ -35,64 +63,94 @@ button:active{transform:scale(.96)}
 </head>
 <body>
 <canvas id="view"></canvas>
-<div id="top"><span>🌕 LUNAR CAM</span><span id="rec">● REC 00:00</span><span id="status"></span></div>
-<div id="hint">「📷 撮影開始」でカメラを起動します。<br>映った<b>ものをタップ</b>すると、そのものを最前面に残し、<br>それ以外が月面・宇宙空間に置き換わります。</div>
+<div id="top">
+  <div id="topline"><span>🌕 LUNAR CAM <small id="ver"></small></span><span id="rec">● REC 00:00</span><span id="status"></span></div>
+  <div id="modeseg" role="tablist" aria-label="撮影モード">
+    <button class="seg on" id="mode-obj" role="tab" title="タップで指定した「もの」を最前面に残します">📦 ものを撮る</button>
+    <button class="seg" id="mode-per" role="tab" title="人物を自動で検出して最前面に残します">🧍 人物を撮る</button>
+  </div>
+  <div id="pills"><span class="pill" id="pCam"></span><span class="pill" id="pFx"></span><span class="pill" id="pGyro"></span><span class="pill" id="pTgt"></span></div>
+</div>
+<div id="hint"></div>
 
 <div id="bottom">
   <div id="panel">
-    <div class="sub">背景除去(クロマキー)</div>
-    <div class="row" id="keychips" style="justify-content:flex-start;margin-bottom:4px">
-      <button class="chip on" data-k="track">👆 タップで対象指定</button><button class="chip" data-k="green">緑</button><button class="chip" data-k="blue">青</button>
-      <button class="chip" data-k="black">黒</button><button class="chip" data-k="white">白</button>
-      <button class="chip" data-k="pick">🎯 タップで色指定</button><button class="chip" data-k="diff">📸 背景を登録(差分)</button><button class="chip" data-k="off">除去なし</button>
-      <span id="sw"></span>
+    <div id="tabs">
+      <button class="tab on" data-t="t1">対象</button><button class="tab" data-t="t2">光と影</button><button class="tab" data-t="t3">宇宙</button><button class="tab" data-t="t4">視点・カメラ</button>
     </div>
-    <label>除去の強さ<input type="range" id="tol" min="4" max="70" value="26"><span class="val" id="tolv"></span></label>
-    <label>境界ぼかし<input type="range" id="soft" min="2" max="40" value="12"><span class="val" id="softv"></span></label>
-    <div class="sub">宇宙の見た目</div>
-    <label>太陽の方位<input type="range" id="sun" min="0" max="360" value="160"><span class="val" id="sunv"></span></label>
-    <label>被写体コントラスト<input type="range" id="con" min="80" max="230" value="120"><span class="val" id="conv"></span></label>
-    <label>太陽の高度<input type="range" id="sunel" min="2" max="80" value="14"><span class="val" id="sunelv"></span></label>
-    <label>地形の影<input type="range" id="tsh" min="0" max="100" value="80"><span class="val" id="tshv"></span></label>
-    <label>ものの影の長さ<input type="range" id="osh" min="0" max="200" value="100"><span class="val" id="oshv"></span></label>
-    <label>ものの陰影<input type="range" id="oshd" min="0" max="100" value="80"><span class="val" id="oshdv"></span></label>
-    <label>地球照(青い反射光)<input type="range" id="esh" min="0" max="100" value="40"><span class="val" id="eshv"></span></label>
-    <label>地球の大きさ<input type="range" id="earth" min="1" max="12" value="4" step="0.5"><span class="val" id="earthv"></span></label>
-    <label>星の量<input type="range" id="stars" min="0" max="100" value="80"><span class="val" id="starsv"></span></label>
-    <div class="sub">カメラ・視点</div>
-    <div class="sub">人物モード</div>
-    <div class="row" style="justify-content:flex-start;margin-bottom:4px">
-      <button class="chip on" id="mirror">🪞 鏡像表示(前面カメラ)</button>
-      <button class="chip" id="invmask">⇄ マスク反転</button>
+
+    <div class="sec" data-t="t1">
+      <div class="obj-only">
+        <div class="sub">📦 ものモード: 撮りたいものを、画面上で<b>タップ</b>して指定します。別の部分をタップすると、対象に追加されます。</div>
+        <div class="sub">対象の切り出し方</div>
+        <div class="row" id="keychips" style="justify-content:flex-start;margin-bottom:4px">
+          <button class="chip on" data-k="track">👆 タップで指定</button><button class="chip" data-k="green">緑の背景</button><button class="chip" data-k="blue">青の背景</button>
+          <button class="chip" data-k="black">黒の背景</button><button class="chip" data-k="white">白の背景</button>
+          <button class="chip" data-k="pick">🎯 背景色をタップ</button><button class="chip" data-k="diff">📸 背景を登録(差分)</button><button class="chip" data-k="off">切り出さない</button>
+          <span id="sw"></span>
+        </div>
+        <label>切り出しの強さ<input type="range" id="tol" min="4" max="70" value="26"><span class="val" id="tolv"></span></label>
+        <label>境界のぼかし<input type="range" id="soft" min="2" max="40" value="12"><span class="val" id="softv"></span></label>
+      </div>
+      <div class="per-only">
+        <div class="sub">🧍 人物モード: 人物を自動で検出します(タップ不要・複数人OK)。</div>
+        <div class="row" style="justify-content:flex-start;margin-bottom:4px">
+          <button class="chip on" id="mirror"></button>
+          <button class="chip" id="invmask"></button>
+        </div>
+        <label>上半身の下端<input type="range" id="cut" min="20" max="100" value="100"><span class="val" id="cutv"></span></label>
+        <div class="sub">人物が消えて背景だけが残る場合は「マスク反転」を押してください。立って全身が映る場合は、下端を上げて(数値を下げて)上半身だけにします。</div>
+      </div>
     </div>
-    <label>上半身の下端<input type="range" id="cut" min="20" max="100" value="100"><span class="val" id="cutv"></span></label>
-    <div class="sub">月面との距離感(ピンチでも高度を変更)</div>
-    <label>カメラ高度<input type="range" id="alt" min="0" max="100" value="25"><span class="val" id="altv"></span></label>
-    <label>距離連動の強さ<input type="range" id="kk" min="0" max="200" value="120"><span class="val" id="kkv"></span></label>
-    <label>移動の倍率<input type="range" id="gain" min="1" max="30" value="6"><span class="val" id="gainv"></span></label>
-    <label>撮影距離<input type="range" id="dist" min="20" max="200" value="60"><span class="val" id="distv"></span></label>
-    <label>画角(長辺)<input type="range" id="fov" min="40" max="100" value="66"><span class="val" id="fovv"></span></label>
-    <label>背景の画質<input type="range" id="qual" min="40" max="150" value="100"><span class="val" id="qualv"></span></label>
-    <div class="row" style="justify-content:flex-start">
-      <button class="chip" id="flip">🔄 前面/背面</button>
+
+    <div class="sec" data-t="t2" style="display:none">
+      <label>太陽の方位<input type="range" id="sun" min="0" max="360" value="160"><span class="val" id="sunv"></span></label>
+      <label>太陽の高度<input type="range" id="sunel" min="2" max="80" value="14"><span class="val" id="sunelv"></span></label>
+      <label>地形の影<input type="range" id="tsh" min="0" max="100" value="80"><span class="val" id="tshv"></span></label>
+      <label class="obj-only">ものの影の長さ<input type="range" id="osh" min="0" max="200" value="100"><span class="val" id="oshv"></span></label>
+      <label>被写体の陰影<input type="range" id="oshd" min="0" max="100" value="80"><span class="val" id="oshdv"></span></label>
+      <label>被写体のコントラスト<input type="range" id="con" min="80" max="230" value="120"><span class="val" id="conv"></span></label>
+      <label>地球照(青い反射光)<input type="range" id="esh" min="0" max="100" value="40"><span class="val" id="eshv"></span></label>
+      <div class="sub">太陽の高度を低く(5〜15°)すると、月面の影が長く出ます。</div>
+    </div>
+
+    <div class="sec" data-t="t3" style="display:none">
+      <label>地球の大きさ<input type="range" id="earth" min="1" max="12" value="4" step="0.5"><span class="val" id="earthv"></span></label>
+      <label>星の量<input type="range" id="stars" min="0" max="100" value="80"><span class="val" id="starsv"></span></label>
+      <label>背景の画質<input type="range" id="qual" min="40" max="150" value="100"><span class="val" id="qualv"></span></label>
+      <div class="sub">動きが重いときは、背景の画質を下げてください。</div>
+    </div>
+
+    <div class="sec" data-t="t4" style="display:none">
+      <div class="sub">月面との距離感(2本指のピンチでも高度を変えられます)</div>
+      <label>カメラ高度<input type="range" id="alt" min="0" max="100" value="25"><span class="val" id="altv"></span></label>
+      <label>距離連動の強さ<input type="range" id="kk" min="0" max="200" value="120"><span class="val" id="kkv"></span></label>
+      <label>移動の倍率<input type="range" id="gain" min="1" max="30" value="6"><span class="val" id="gainv"></span></label>
+      <label>撮影距離(目安)<input type="range" id="dist" min="20" max="200" value="60"><span class="val" id="distv"></span></label>
+      <div class="sub">カメラ</div>
+      <label>画角(長辺)<input type="range" id="fov" min="40" max="100" value="66"><span class="val" id="fovv"></span></label>
+      <div class="row" style="justify-content:flex-start"><button class="chip" id="flip">🔄 前面/背面カメラを切り替え</button></div>
     </div>
   </div>
-  <div class="row" id="presets">
-    <button class="chip" data-v="ground">⬇ 地表</button>
-    <button class="chip" data-v="horizon">➖ 水平線</button>
-    <button class="chip" data-v="earth">🌍 地球を見る</button>
-    <button class="chip" data-v="sky">✨ 星空</button>
-    <button class="chip on" id="modebtn">📦 ものモード</button>
-    <button class="chip" id="gyro">🧭 ジャイロ</button>
-    <button class="chip" id="zero">⌖ 正面リセット</button>
-    <button class="chip" id="untrack">✖ 対象解除</button>
+
+  <div id="viewrow">
+    <span class="lbl">視点</span>
+    <div class="row" id="presets">
+      <button class="chip" data-v="ground">⬇ 地表</button>
+      <button class="chip" data-v="horizon">➖ 水平線</button>
+      <button class="chip" data-v="earth">🌍 地球</button>
+      <button class="chip" data-v="sky">✨ 星空</button>
+      <button class="chip" id="gyro"></button>
+      <button class="chip" id="zero" title="いま向いている方向を正面にします">⌖ 正面</button>
+      <button class="chip obj-only" id="untrack" style="display:none">✖ 対象を解除</button>
+    </div>
   </div>
-  <div class="row">
-    <button class="main" id="cam">📷<br>撮影開始</button>
-    <button class="main on" id="fx">🌕<br>レンダリング</button>
-    <button class="main" id="snap">💾<br>画面保存</button>
-    <button class="main" id="recbtn">⏺<br>録画</button>
-    <button class="main" id="cfg">🎛<br>設定</button>
+  <div id="mainrow">
+    <button class="main go" id="cam"><span class="ic">📷</span><span class="tx">撮影開始</span></button>
+    <button class="main on" id="fx"><span class="ic">🌕</span><span class="tx">背景合成</span></button>
+    <button class="main" id="snap"><span class="ic">💾</span><span class="tx">写真を保存</span></button>
+    <button class="main" id="recbtn"><span class="ic">⏺</span><span class="tx">録画</span></button>
+    <button class="main" id="cfg"><span class="ic">⚙</span><span class="tx">設定</span></button>
   </div>
 </div>
 
@@ -106,6 +164,7 @@ button:active{transform:scale(.96)}
 <script>
 (()=>{
 const $=id=>document.getElementById(id);
+const VERSION='2026-10-18e';$('ver').textContent='v'+VERSION;
 const cv=$('view'),ctx=cv.getContext('2d'),vid=$('vid');
 let W=0,H=0,DPR=1,ppd=10;
 const S={person:false,mirror:true,cut:1,inv:false,tshadow:.8,oshadow:1,oshade:.8,eshine:.4,gain:6,dist:.6,k:1.2,track:true,diff:false,tol:26,soft:12,keyOn:true,key:[0,177,64],keyName:'green',sunAz:160,con:1.2,earthSize:4,sunEl:14,fov:66,stars:.8,render:true,
@@ -338,6 +397,7 @@ function processVideo(lightX,cosL,sunC){
           const nz=Math.sqrt(Math.max(0,1-nx*nx-ny*ny));let lam=nx*c0+ny*c1+nz*c2;if(lam<0)lam=0;
           const m=1+ostr*(.1+1.6*lam-1),ea=esh*(1-Math.min(1,lam*3));
           r=((r-128)*con+128)*m*1.04+ea*6;g=((g-128)*con+128)*m+ea*12;b=((b-128)*con+128)*m*.94+ea*28;
+          if(r!==r||g!==g||b!==b){r=d[i];g=d[i+1];b=d[i+2]} // never let a NaN turn the object black
           d[i]=r<0?0:r>255?255:r;d[i+1]=g<0?0:g>255?255:g;d[i+2]=b<0?0:b>255?255:b;
         }else{d[i]=r;d[i+1]=g;d[i+2]=b}
         if(a>200){col[x]++;row[y]++}
@@ -553,11 +613,11 @@ function devMat(){
 }
 function onOri(e){if(e.beta==null)return;ori={a:e.alpha||0,b:e.beta,g:e.gamma||0}}
 async function toggleGyro(){
-  if(gyroOn){gyroOn=false;removeEventListener('deviceorientation',onOri);$('gyro').classList.remove('on');
+  if(gyroOn){gyroOn=false;removeEventListener('deviceorientation',onOri);refreshUI();
     yawT=fwdAz(Rcur);pitchT=fwdEl(Rcur);return}
   try{if(window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission){if(await DeviceOrientationEvent.requestPermission()!=='granted')return}}
   catch(e){alert('モーションセンサーの許可が必要です');return}
-  ori=null;needZero=true;gyroOn=true;addEventListener('deviceorientation',onOri);$('gyro').classList.add('on');
+  ori=null;needZero=true;gyroOn=true;addEventListener('deviceorientation',onOri);refreshUI();
 }
 $('gyro').onclick=toggleGyro;
 $('zero').onclick=()=>{if(gyroOn)needZero=true;else{yawT=0}};
@@ -663,7 +723,7 @@ function frame(){
   }
   updateHint();
   const now=performance.now();
-  if(now-t0>250){t0=now;$('status').textContent=`方位 ${((fwdAz(R)%360)+360)%360|0}° / 仰角 ${fwdEl(R)|0}°`+` / 高度 ${fmtAlt(camH)}`+(gyroOn?' 🧭':'')}
+  if(now-t0>250){t0=now;refreshUI();$('status').textContent=`方位 ${((fwdAz(R)%360)+360)%360|0}° / 仰角 ${fwdEl(R)|0}°`+` / 高度 ${fmtAlt(camH)}`+(gyroOn?' 🧭':'')}
 }
 requestAnimationFrame(frame);
 
@@ -675,24 +735,27 @@ async function startCam(){
     if(stream)stream.getTracks().forEach(t=>t.stop());
     stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:S.facing},width:{ideal:1280},height:{ideal:720}},audio:false});
     vid.srcObject=stream;await vid.play();camOn=true;
-    $('cam').innerHTML='⏹<br>カメラ停止';$('cam').classList.add('red');$('hint').style.display='none';
+    setBtn($('cam'),'⏹','カメラ停止');$('cam').classList.add('red');$('cam').classList.remove('go');$('hint').style.display='none';refreshUI();
     try{if(navigator.wakeLock)navigator.wakeLock.request('screen')}catch(e){}
   }catch(e){alert('カメラを起動できませんでした: '+e.message)}
 }
 function stopCam(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;camOn=false;bbox=null;
-  $('cam').innerHTML='📷<br>撮影開始';$('cam').classList.remove('red');$('hint').style.display=''}
+  setBtn($('cam'),'📷','撮影開始');$('cam').classList.remove('red');$('cam').classList.add('go');idleHint();refreshUI()}
 $('cam').onclick=()=>camOn?stopCam():startCam();
 function applyMode(){
-  $('modebtn').textContent=S.person?'🧍 人物モード':'📦 ものモード';$('modebtn').classList.toggle('on',!S.person);
+  document.body.classList.toggle('person',S.person);
   needRef=true;objRef=null;sSm=1;Tsm=[0,0,0];bbox=null;pBox=null;pInfo=null;hadInfo=false;
-  S.facing=S.person?'user':'environment';if(camOn)startCam();
+  S.facing=S.person?'user':'environment';if(camOn)startCam();else idleHint();
+  refreshUI();
 }
-$('modebtn').onclick=()=>{S.person=!S.person;applyMode()};
-$('mirror').onclick=e=>{S.mirror=!S.mirror;e.target.classList.toggle('on',S.mirror)};
-$('invmask').onclick=e=>{S.inv=!S.inv;e.target.classList.toggle('on',S.inv)};
+function setMode(p){if(S.person!==p){S.person=p;applyMode()}}
+$('mode-obj').onclick=()=>setMode(false);
+$('mode-per').onclick=()=>setMode(true);
+$('mirror').onclick=()=>{S.mirror=!S.mirror;refreshUI()};
+$('invmask').onclick=()=>{S.inv=!S.inv;refreshUI()};
 $('flip').onclick=()=>{S.facing=S.facing==='environment'?'user':'environment';if(camOn)startCam()};
-$('fx').onclick=e=>{S.render=!S.render;$('fx').classList.toggle('on',S.render)};
-$('cfg').onclick=()=>{const p=$('panel');p.style.display=p.style.display==='block'?'none':'block'};
+$('fx').onclick=()=>{S.render=!S.render;refreshUI()};
+$('cfg').onclick=()=>{const p=$('panel');p.style.display=p.style.display==='block'?'none':'block';refreshUI()};
 
 // ---------- settings ----------
 function bind(id,key,fmt,scale=1){const el=$(id),out=$(id+'v');const f=()=>{S[key]=el.value*scale;out.textContent=fmt(el.value)};el.oninput=f;f()}
@@ -746,12 +809,54 @@ $('recbtn').onclick=()=>{
   const mt=['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
   rec=new MediaRecorder(cv.captureStream(30),mt?{mimeType:mt,videoBitsPerSecond:6e6}:{});chunks=[];
   rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
-  rec.onstop=()=>{clearInterval(recTimer);$('rec').style.display='none';$('recbtn').classList.remove('red');$('recbtn').innerHTML='⏺<br>録画';
+  rec.onstop=()=>{clearInterval(recTimer);$('rec').style.display='none';$('recbtn').classList.remove('red');setBtn($('recbtn'),'⏺','録画');
     const type=(rec.mimeType||mt||'video/webm').split(';')[0];const ext=type.includes('mp4')?'mp4':'webm';
     const blob=new Blob(chunks,{type});rec=null;showResult(blob,`lunar-${stamp()}.${ext}`,true)};
-  rec.start(500);recT=Date.now();$('rec').style.display='inline';$('recbtn').classList.add('red');$('recbtn').innerHTML='⏹<br>停止';
+  rec.start(500);recT=Date.now();$('rec').style.display='inline';$('recbtn').classList.add('red');setBtn($('recbtn'),'⏹','録画を停止');
   recTimer=setInterval(()=>{const s=(Date.now()-recT)/1000|0;$('rec').textContent=`● REC ${String(s/60|0).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`},250);
 };
+
+// ---------- UI state ----------
+function setBtn(b,ic,tx){b.innerHTML='<span class="ic">'+ic+'</span><span class="tx">'+tx+'</span>'}
+const onOff=on=>'<span class="st">'+(on?'ON':'OFF')+'</span>';
+let curTab='t1';
+function showTab(){
+  document.querySelectorAll('#tabs .tab').forEach(b=>b.classList.toggle('on',b.dataset.t===curTab));
+  document.querySelectorAll('#panel .sec').forEach(sec=>{sec.style.display=sec.dataset.t===curTab?'':'none'});
+}
+document.querySelectorAll('#tabs .tab').forEach(b=>{b.onclick=()=>{curTab=b.dataset.t;showTab()}});
+function idleHint(){
+  const h=$('hint');hintShown=false;hintTxt='';h.style.display='';
+  h.innerHTML=S.person
+    ?'「📷 撮影開始」でカメラを起動します。<br><b>人物を自動で検出</b>し、人物を最前面に残して、<br>それ以外を月面・宇宙空間に置き換えます。'
+    :'「📷 撮影開始」でカメラを起動します。<br>映った<b>ものをタップ</b>すると、そのものが最前面に残り、<br>それ以外が月面・宇宙空間に置き換わります。';
+}
+function pill(el,text,cls){el.textContent=text;el.className='pill'+(cls?' '+cls:'')}
+function refreshUI(){
+  $('mode-obj').classList.toggle('on',!S.person);$('mode-per').classList.toggle('on',S.person);
+  document.body.classList.toggle('person',S.person);
+  $('fx').innerHTML='<span class="ic">🌕</span><span class="tx">背景合成 '+onOff(S.render)+'</span>';$('fx').classList.toggle('on',S.render);
+  $('gyro').innerHTML='🧭 ジャイロ '+onOff(gyroOn);$('gyro').classList.toggle('on',gyroOn);
+  $('mirror').innerHTML='🪞 鏡像表示 '+onOff(S.mirror);$('mirror').classList.toggle('on',S.mirror);
+  $('invmask').innerHTML='⇄ マスク反転 '+onOff(S.inv);$('invmask').classList.toggle('on',S.inv);
+  $('cfg').classList.toggle('on',$('panel').style.display==='block');
+  $('untrack').style.display=(!S.person&&TG)?'':'none';
+  pill($('pCam'),camOn?'カメラ: '+(S.facing==='user'?'前面':'背面'):'カメラ: 停止中',camOn?'ok':'');
+  pill($('pFx'),'背景合成: '+(S.render?'ON':'OFF'),S.render?'ok':'warn');
+  pill($('pGyro'),'ジャイロ: '+(gyroOn?'ON':'OFF'),gyroOn?'ok':'');
+  let tt='対象: ―',tc='';
+  if(camOn){
+    if(S.person){
+      if(segState==='error'){tt='人物: モデル読込失敗';tc='warn'}
+      else if(segState!=='ready'){tt='人物: モデル読込中…';tc='warn'}
+      else if(pInfo){tt='人物: 検出中';tc='ok'}
+      else{tt='人物: 見つかりません';tc='warn'}
+    }else if(TG){if(tgLost>6){tt='対象: 見失い';tc='warn'}else{tt='対象: 追跡中';tc='ok'}}
+    else{tt='対象: 未選択(タップ)';tc='warn'}
+  }
+  pill($('pTgt'),tt,tc);
+}
+showTab();idleHint();refreshUI();
 })();
 </script>
 </body>
