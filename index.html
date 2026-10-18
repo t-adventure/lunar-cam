@@ -314,7 +314,7 @@ function processVideo(lightX,cosL,sunC){
   if(pick){const cr=coverRect(kw,kh);const px=Math.round((pick.x-cr.dx)/cr.s),py=Math.round((pick.y-cr.dy)/cr.s);
     let r=0,g=0,b=0,n=0;for(let yy=py-3;yy<=py+3;yy++)for(let xx=px-3;xx<=px+3;xx++){if(xx<0||yy<0||xx>=kw||yy>=kh)continue;const i=(yy*kw+xx)*4;r+=d[i];g+=d[i+1];b+=d[i+2];n++}
     if(n){S.key=[r/n,g/n,b/n];S.keyOn=true;S.diff=false;setKeyUI('pick')}pick=null}
-  const bb=bbox,ox0=bb?bb.x0:0,ox1=bb?bb.x1:kw,oy0=bb&&bb.y0!=null?bb.y0:0,oy1=bb?bb.y1:kh;
+  const bb=bbox&&isFinite(bbox.x0+bbox.x1+bbox.y0+bbox.y1)?bbox:null,ox0=bb?bb.x0:0,ox1=bb?bb.x1:kw,oy0=bb&&bb.y0!=null?bb.y0:0,oy1=bb?bb.y1:kh;
   const ocx=(ox0+ox1)/2,ocy=(oy0+oy1)/2,ohw=Math.max(8,(ox1-ox0)/2),ohh=Math.max(8,(oy1-oy0)/2),c0=sunC[0],c1=sunC[1],c2=sunC[2],ostr=S.oshade,esh=S.eshine;
   const [kr,kg,kb]=S.key,tol=S.tol,soft=S.soft,con=S.con;
   const diffMode=S.diff,ref=refData,kCb=-.169*kr-.331*kg+.5*kb,kCr=.5*kr-.419*kg-.081*kb;
@@ -351,8 +351,9 @@ function processVideo(lightX,cosL,sunC){
   let x0=-1,x1=-1,y0=-1,y1=-1;
   for(let x=0;x<kw;x++)if(col[x]>=4){if(x0<0)x0=x;x1=x}
   for(let y=0;y<kh;y++)if(row[y]>=4){if(y0<0)y0=y;y1=y}
-  if(S.keyOn&&x0>=0&&x1-x0>12&&y1-y0>12){const nb={x0,x1,y1};
-    if(!bbox)bbox=nb;else{for(const k in nb)bbox[k]+=(nb[k]-bbox[k])*.3}}
+  if(S.person||S.track){/* bbox comes from the person mask / tracked target below */}
+  else if(S.keyOn&&x0>=0&&x1-x0>12&&y1-y0>12){const nb={x0,x1,y0,y1};
+    if(!bbox||bbox.y0==null)bbox=nb;else{for(const k in nb)bbox[k]+=(nb[k]-bbox[k])*.3}}
   else if(!S.keyOn||x0<0)bbox=null;
   if(S.person){if(pBox&&!raw){const nb={x0:pBox.x0*kw/PWD,x1:(pBox.x1+1)*kw/PWD,y0:pBox.y0*kh/pcv.height,y1:(pBox.y1+1)*kh/pcv.height};if(!bbox)bbox=nb;else for(const k in nb)bbox[k]+=(nb[k]-bbox[k])*.4}else bbox=null}
   else if(S.track){if(TG&&tgLost<=6){const nb={x0:TG.box.x0*kw/MW,x1:(TG.box.x1+1)*kw/MW,y0:TG.box.y0*kh/MH,y1:(TG.box.y1+1)*kh/MH};if(!bbox)bbox=nb;else for(const k in nb)bbox[k]+=(nb[k]-bbox[k])*.4}else bbox=null}
@@ -683,7 +684,7 @@ function stopCam(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null
 $('cam').onclick=()=>camOn?stopCam():startCam();
 function applyMode(){
   $('modebtn').textContent=S.person?'🧍 人物モード':'📦 ものモード';$('modebtn').classList.toggle('on',!S.person);
-  needRef=true;objRef=null;sSm=1;Tsm=[0,0,0];bbox=null;pInfo=null;hadInfo=false;
+  needRef=true;objRef=null;sSm=1;Tsm=[0,0,0];bbox=null;pBox=null;pInfo=null;hadInfo=false;
   S.facing=S.person?'user':'environment';if(camOn)startCam();
 }
 $('modebtn').onclick=()=>{S.person=!S.person;applyMode()};
