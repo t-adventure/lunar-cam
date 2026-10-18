@@ -53,6 +53,10 @@ button:active{transform:scale(.96)}
     <label>太陽の方位<input type="range" id="sun" min="0" max="360" value="160"><span class="val" id="sunv"></span></label>
     <label>被写体コントラスト<input type="range" id="con" min="80" max="230" value="120"><span class="val" id="conv"></span></label>
     <label>太陽の高度<input type="range" id="sunel" min="2" max="80" value="14"><span class="val" id="sunelv"></span></label>
+    <label>地形の影<input type="range" id="tsh" min="0" max="100" value="80"><span class="val" id="tshv"></span></label>
+    <label>ものの影の長さ<input type="range" id="osh" min="0" max="200" value="100"><span class="val" id="oshv"></span></label>
+    <label>ものの陰影<input type="range" id="oshd" min="0" max="100" value="80"><span class="val" id="oshdv"></span></label>
+    <label>地球照(青い反射光)<input type="range" id="esh" min="0" max="100" value="40"><span class="val" id="eshv"></span></label>
     <label>地球の大きさ<input type="range" id="earth" min="1" max="12" value="4" step="0.5"><span class="val" id="earthv"></span></label>
     <label>星の量<input type="range" id="stars" min="0" max="100" value="80"><span class="val" id="starsv"></span></label>
     <div class="sub">カメラ・視点</div>
@@ -97,7 +101,7 @@ button:active{transform:scale(.96)}
 const $=id=>document.getElementById(id);
 const cv=$('view'),ctx=cv.getContext('2d'),vid=$('vid');
 let W=0,H=0,DPR=1,ppd=10;
-const S={gain:6,dist:.6,k:1.2,track:true,diff:false,tol:26,soft:12,keyOn:true,key:[0,177,64],keyName:'green',sunAz:160,con:1.2,earthSize:4,sunEl:14,fov:66,stars:.8,render:true,
+const S={tshadow:.8,oshadow:1,oshade:.8,eshine:.4,gain:6,dist:.6,k:1.2,track:true,diff:false,tol:26,soft:12,keyOn:true,key:[0,177,64],keyName:'green',sunAz:160,con:1.2,earthSize:4,sunEl:14,fov:66,stars:.8,render:true,
   earthAz:35,earthEl:22,facing:'environment'};
 function resize(){
   W=innerWidth;H=innerHeight;
@@ -233,23 +237,39 @@ const hL=[],aL=[];
 })();
 const gcv=document.createElement('canvas'),gctx=gcv.getContext('2d');let gImg=null,g32=null;
 function groundAt(R,sx,sy){const X=(sx-W/2)/focal,Y=(H/2-sy)/focal;return X*R[3]+Y*R[4]-R[5]<-1e-3}
-let oLam=0,oA=0;
+const shL=[];let shadowDirty=true,lastShadow=0;
+function computeShadow(sunV){
+  const sz1=512,msk=511,H1=hL[1];let dx=sunV[0],dz=sunV[2];const hl=Math.hypot(dx,dz)||1;dx/=hl;dz/=hl;
+  const tanEl=sunV[1]/Math.max(1e-3,hl),D=[1,2,3,4,6,8,11,15,20,28,38,52,72,100],nd=D.length,ox=new Int32Array(nd),oy=new Int32Array(nd);
+  for(let k=0;k<nd;k++){ox[k]=Math.round(dx*D[k]);oy[k]=Math.round(dz*D[k])}
+  const out=new Uint8Array(sz1*sz1);
+  for(let y=0;y<sz1;y++)for(let x=0;x<sz1;x++){
+    const i=y*sz1+x,h0=H1[i];let ms=-9;
+    for(let k=0;k<nd;k++){const sl=(H1[(((y+oy[k])&msk)*sz1)+((x+ox[k])&msk)]-h0)/(D[k]*2);if(sl>ms)ms=sl}
+    const v=(ms-tanEl)/.05+.5;out[i]=v<=0?0:v>=1?255:v*255}
+  shL[1]=out;
+  for(let l=2;l<NLV;l++){const sz=TS>>l,ps=sz*2,pa=shL[l-1],na=new Uint8Array(sz*sz);
+    for(let y=0;y<sz;y++)for(let x=0;x<sz;x++){const i=(y*2)*ps+x*2;na[y*sz+x]=(pa[i]+pa[i+1]+pa[i+ps]+pa[i+ps+1])>>2}
+    shL[l]=na}
+}
+let oLam=0,oA=0,oS=0;
 function samp(li,u,v,sx,sy,sz){
   const size=TS>>li,msk=size-1,sc=size/TILE,tx=Math.floor(u*sc)&msk,ty=Math.floor(v*sc)&msk,idx=ty*size+tx,hh=hL[li],st=1<<li;
   const gx=(hh[ty*size+((tx+1)&msk)]-hh[idx])/st,gz=(hh[((ty+1)&msk)*size+tx]-hh[idx])/st;
   oLam=(-gx*sx+sy-gz*sz)/Math.sqrt(1+gx*gx+gz*gz);oA=aL[li][idx]/255;
+  oS=li<1?shL[1][(ty>>1)*512+(tx>>1)]/255:shL[li][idx]/255;
 }
 // terrain is self-similar: layer n is the same map at 16^n x scale (n=-2..4), so zooming in/out never runs out of detail
 const PW=[];for(let n=-2;n<=5;n++)PW[n+2]=Math.pow(16,-n);
 function layer(n,u,v,rr,sx,sy,sz){
   const pw=PW[n+2],uu=u*pw+137.3*n,vv=v*pw+61.7*n,lf=rr<0?0:rr>NLV-1.01?NLV-1.01:rr,l0=lf|0,fr=lf-l0;
   samp(l0,uu,vv,sx,sy,sz);
-  if(fr>.03){const l1=oLam,a1=oA;samp(l0+1,uu,vv,sx,sy,sz);oLam=l1+(oLam-l1)*fr;oA=a1+(oA-a1)*fr}
+  if(fr>.03){const l1=oLam,a1=oA,s1=oS;samp(l0+1,uu,vv,sx,sy,sz);oLam=l1+(oLam-l1)*fr;oA=a1+(oA-a1)*fr;oS=s1+(oS-s1)*fr}
 }
 function drawGround(R,sunV,quality,hc,cx,cz){
   const gs=Math.max(1.5,Math.sqrt(W*H/(90000*quality))),gw=Math.ceil(W/gs),gh=Math.ceil(H/gs);
   if(!gImg||gImg.width!==gw||gImg.height!==gh){gcv.width=gw;gcv.height=gh;gImg=gctx.createImageData(gw,gh);g32=new Uint32Array(gImg.data.buffer)}
-  const sx=sunV[0],sy=sunV[1],sz=sunV[2],expo=.72/Math.max(.22,sy),texM=TILE/TS,inv=1/(focal);
+  const sx=sunV[0],sy=sunV[1],sz=sunV[2],expo=.72/Math.max(.22,sy),texM=TILE/TS,inv=1/(focal),tsh=S.tshadow,amb=.012+S.eshine*.02;
   const R00=R[0],R01=R[1],R02=R[2],R10=R[3],R11=R[4],R12=R[5],R20=R[6],R21=R[7],R22=R[8];
   for(let j=0;j<gh;j++){
     const Y=(H/2-(j+.5)*gs)*inv;let q=j*gw;
@@ -260,12 +280,12 @@ function drawGround(R,sunV,quality,hc,cx,cz){
       const lf0=Math.log2(gs*hc/(focal*ry*ry)/texM);
       let n=Math.floor(lf0/4);n=n<-2?-2:n>4?4:n;
       const r=lf0-4*n;
-      layer(n,u,v,r,sx,sy,sz);let lam=oLam,a=oA;
-      if(r>3&&n<4){const w=r>4?1:r-3;layer(n+1,u,v,0,sx,sy,sz);lam+=(oLam-lam)*w;a+=(oA-a)*w}
+      layer(n,u,v,r,sx,sy,sz);let lam=oLam,a=oA,sh=oS;
+      if(r>3&&n<4){const w=r>4?1:r-3;layer(n+1,u,v,0,sx,sy,sz);lam+=(oLam-lam)*w;a+=(oA-a)*w;sh+=(oS-sh)*w}
       const ff=(lf0-20)/3;if(ff>0){const w=ff>1?1:ff;lam+=(sy-lam)*w;a+=(.5-a)*w}
       const L=Math.sqrt(X*X+Y*Y+1),cph=-(rx*sx+ry*sy+rz*sz)/L;
       let surge=1;if(cph>0){const c2=cph*cph;surge=1+.6*c2*c2*c2}
-      const xx=((lam>0?lam:0)*expo+.012)*a*surge,val=255*(1-Math.exp(-1.6*xx));
+      const xx=((lam>0?lam:0)*(1-sh*tsh)*expo+amb)*a*surge,val=255*(1-Math.exp(-1.6*xx));
       g32[q]=0xFF000000|((val*.92)<<16)|((val*.97)<<8)|val;
     }
   }
@@ -277,7 +297,7 @@ function drawGround(R,sunV,quality,hc,cx,cz){
 const kc=document.createElement('canvas'),kx=kc.getContext('2d',{willReadFrequently:true});
 let camOn=false,stream=null,bbox=null,pick=null,refData=null,capRef=false,refKW=0;
 function coverRect(sw,sh){const s=Math.max(W/sw,H/sh);return{s,dx:(W-sw*s)/2,dy:(H-sh*s)/2}}
-function processVideo(lightX,cosL){
+function processVideo(lightX,cosL,sunC){
   const vw=vid.videoWidth,vh=vid.videoHeight;if(!vw||vid.readyState<2)return null;
   const kw=480,kh=Math.round(kw*vh/vw);if(kc.width!==kw||kc.height!==kh){kc.width=kw;kc.height=kh;refData=null}
   const raw=S.track&&!trackStep(vw,vh,kw,kh);
@@ -287,6 +307,8 @@ function processVideo(lightX,cosL){
   if(pick){const cr=coverRect(kw,kh);const px=Math.round((pick.x-cr.dx)/cr.s),py=Math.round((pick.y-cr.dy)/cr.s);
     let r=0,g=0,b=0,n=0;for(let yy=py-3;yy<=py+3;yy++)for(let xx=px-3;xx<=px+3;xx++){if(xx<0||yy<0||xx>=kw||yy>=kh)continue;const i=(yy*kw+xx)*4;r+=d[i];g+=d[i+1];b+=d[i+2];n++}
     if(n){S.key=[r/n,g/n,b/n];S.keyOn=true;S.diff=false;setKeyUI('pick')}pick=null}
+  const bb=bbox,ox0=bb?bb.x0:0,ox1=bb?bb.x1:kw,oy0=bb&&bb.y0!=null?bb.y0:0,oy1=bb?bb.y1:kh;
+  const ocx=(ox0+ox1)/2,ocy=(oy0+oy1)/2,ohw=Math.max(8,(ox1-ox0)/2),ohh=Math.max(8,(oy1-oy0)/2),c0=sunC[0],c1=sunC[1],c2=sunC[2],ostr=S.oshade,esh=S.eshine;
   const [kr,kg,kb]=S.key,tol=S.tol,soft=S.soft,con=S.con;
   const diffMode=S.diff,ref=refData,kCb=-.169*kr-.331*kg+.5*kb,kCr=.5*kr-.419*kg-.081*kb;
   const chroma=Math.max(kr,kg,kb)-Math.min(kr,kg,kb)>60,dom=kg>=kr&&kg>=kb?1:(kb>=kr?2:0);
@@ -305,8 +327,10 @@ function processVideo(lightX,cosL){
           const o=dom===1?Math.max(r,b):dom===2?Math.max(r,g):Math.max(g,b);
           if(dom===1&&g>o)g=o+(g-o)*.15;else if(dom===2&&b>o)b=o+(b-o)*.15;else if(dom===0&&r>o)r=o+(r-o)*.15}
         if(S.render&&!raw){
-          const lit=.62+lightX*(x/kw-.5)*1.3-(cosL>0?.1*cosL:0),m=.55+.75*lit;
-          r=((r-128)*con+128)*m*1.04;g=((g-128)*con+128)*m;b=((b-128)*con+128)*m*.94;
+          let nx=(x-ocx)/ohw,ny=(ocy-y)/ohh;nx=(nx<-1?-1:nx>1?1:nx)*.85;ny=(ny<-1?-1:ny>1?1:ny)*.85;
+          const nz=Math.sqrt(Math.max(0,1-nx*nx-ny*ny));let lam=nx*c0+ny*c1+nz*c2;if(lam<0)lam=0;
+          const m=1+ostr*(.1+1.6*lam-1),ea=esh*(1-Math.min(1,lam*3));
+          r=((r-128)*con+128)*m*1.04+ea*6;g=((g-128)*con+128)*m+ea*12;b=((b-128)*con+128)*m*.94+ea*28;
           d[i]=r<0?0:r>255?255:r;d[i+1]=g<0?0:g>255?255:g;d[i+2]=b<0?0:b>255?255:b;
         }else{d[i]=r;d[i+1]=g;d[i+2]=b}
         if(a>200){col[x]++;row[y]++}
@@ -322,7 +346,7 @@ function processVideo(lightX,cosL){
   if(S.keyOn&&x0>=0&&x1-x0>12&&y1-y0>12){const nb={x0,x1,y1};
     if(!bbox)bbox=nb;else{for(const k in nb)bbox[k]+=(nb[k]-bbox[k])*.3}}
   else if(!S.keyOn||x0<0)bbox=null;
-  if(S.track){if(TG&&tgLost<=6){const nb={x0:TG.box.x0*kw/MW,x1:(TG.box.x1+1)*kw/MW,y1:(TG.box.y1+1)*kh/MH};if(!bbox)bbox=nb;else for(const k in nb)bbox[k]+=(nb[k]-bbox[k])*.4}else bbox=null}
+  if(S.track){if(TG&&tgLost<=6){const nb={x0:TG.box.x0*kw/MW,x1:(TG.box.x1+1)*kw/MW,y0:TG.box.y0*kh/MH,y1:(TG.box.y1+1)*kh/MH};if(!bbox)bbox=nb;else for(const k in nb)bbox[k]+=(nb[k]-bbox[k])*.4}else bbox=null}
   return{kw,kh,raw};
 }
 
@@ -496,6 +520,29 @@ const upFn=e=>{const had=ptrs.delete(e.pointerId);
   if(ptrs.size===0){drag=null}};
 cv.addEventListener('pointerup',upFn);cv.addEventListener('pointercancel',upFn);
 
+// ---------- object shadow on the regolith ----------
+function screenToGround(R,sx,sy,hc,cx,cz){const X=(sx-W/2)/focal,Y=(H/2-sy)/focal,ry=X*R[3]+Y*R[4]-R[5];if(ry>-1e-3)return null;
+  const t=hc/-ry;return{x:cx+t*(X*R[0]+Y*R[1]-R[2]),z:cz+t*(X*R[6]+Y*R[7]-R[8]),dist:t*Math.hypot(X,Y,1)}}
+function groundToScreen(R,gx,gz,hc,cx,cz){const c=toCam(R,[gx-cx,-hc,gz-cz]),d=-c[2];if(d<=.02)return null;return[W/2+c[0]/d*focal,H/2-c[1]/d*focal]}
+function drawObjShadow(R,sunV,cr,hc,cx,cz,lightX){
+  const bx0=cr.dx+bbox.x0*cr.s,bx1=cr.dx+bbox.x1*cr.s,by=cr.dy+bbox.y1*cr.s,bh=(bbox.y1-(bbox.y0||0))*cr.s,mx=(bx0+bx1)/2;
+  const fl=screenToGround(R,bx0,by-2,hc,cx,cz),fr=screenToGround(R,bx1,by-2,hc,cx,cz),fm=screenToGround(R,mx,by-2,hc,cx,cz);
+  if(!fl||!fr||!fm)return;
+  const hl=Math.hypot(sunV[0],sunV[2])||1,Hm=bh/focal*fm.dist,dx=-sunV[0]/hl,dz=-sunV[2]/hl;
+  let Lm=Math.min(Hm*hl/Math.max(.06,sunV[1]),Hm*12)*S.oshadow,pts=null;
+  for(let k=0;k<4&&!pts;k++,Lm*=.5){
+    const tcx=fm.x+dx*Lm,tcz=fm.z+dz*Lm,q=[[fl.x,fl.z],[fr.x,fr.z],[tcx+(fr.x-fm.x)*.55,tcz+(fr.z-fm.z)*.55],[tcx+(fl.x-fm.x)*.55,tcz+(fl.z-fm.z)*.55]];
+    const pr=q.map(p=>groundToScreen(R,p[0],p[1],hc,cx,cz));if(pr.every(Boolean))pts=pr}
+  if(!pts)return;
+  const BIG=6000,len=Math.hypot(pts[2][0]-pts[0][0],pts[2][1]-pts[0][1]);
+  ctx.save();ctx.beginPath();ctx.moveTo(pts[0][0]+BIG,pts[0][1]);for(let i=1;i<4;i++)ctx.lineTo(pts[i][0]+BIG,pts[i][1]);ctx.closePath();
+  ctx.shadowColor='rgba(0,0,0,.92)';ctx.shadowOffsetX=-BIG;ctx.shadowOffsetY=0;ctx.shadowBlur=Math.max(2,len*.035)*DPR;ctx.fillStyle='#000';ctx.fill();ctx.restore();
+  // contact darkening right under the object
+  const bw=bx1-bx0;ctx.save();ctx.translate(mx,by);ctx.scale(1,.12);
+  const g=ctx.createRadialGradient(0,0,0,0,0,bw*.6);g.addColorStop(0,'rgba(0,0,0,.8)');g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,bw*.6,0,7);ctx.fill();ctx.restore();
+}
+
 // ---------- main loop ----------
 let t0=performance.now();
 function frame(){
@@ -510,9 +557,10 @@ function frame(){
   Rcur=orth(Rcur.map((v,i)=>v+(Rt[i]-v)*k));
   const R=Rcur;
   const sunV=dirVec(S.sunAz,S.sunEl),sc=toCam(R,sunV),lightX=sc[0],cosL=-sc[2];
+  if(shadowDirty&&performance.now()-lastShadow>150){computeShadow(sunV);shadowDirty=false;lastShadow=performance.now()}
   ctx.fillStyle='#000';ctx.fillRect(0,0,W,H);
   let dim=null;
-  if(camOn)dim=processVideo(lightX,cosL);
+  if(camOn)dim=processVideo(lightX,cosL,sc);
   // ---- virtual camera position from the real camera's motion relative to the tapped object ----
   if(!(S.dist>0))S.dist=.6;
   if(camOn&&dim&&S.track&&TG&&tgLost<=6){
@@ -541,15 +589,7 @@ function frame(){
     if(sunIn){ctx.fillStyle='rgba(255,245,225,.05)';ctx.fillRect(0,0,W,H)}
     if(camOn&&dim){
       const cr=coverRect(dim.kw,dim.kh);
-      if(bbox){
-        const bw=(bbox.x1-bbox.x0)*cr.s,cx=cr.dx+(bbox.x0+bbox.x1)/2*cr.s,by=cr.dy+bbox.y1*cr.s;
-        if(groundAt(R,cx,by-2)){
-          ctx.save();const rx=bw*(.55+.45*Math.abs(lightX)),ry=Math.max(6,bw*.1);
-          ctx.translate(cx-lightX*bw*.5,by);ctx.scale(1,ry/rx);
-          const g=ctx.createRadialGradient(0,0,0,0,0,rx);g.addColorStop(0,'rgba(0,0,0,.85)');g.addColorStop(.6,'rgba(0,0,0,.55)');g.addColorStop(1,'rgba(0,0,0,0)');
-          ctx.fillStyle=g;ctx.beginPath();ctx.arc(0,0,rx,0,7);ctx.fill();ctx.restore();
-        }
-      }
+      if(bbox&&S.oshadow>0)drawObjShadow(R,sunV,cr,camH,camX,camZ,lightX);
       ctx.drawImage(kc,cr.dx,cr.dy,dim.kw*cr.s,dim.kh*cr.s);
     }
   }
@@ -581,7 +621,8 @@ $('cfg').onclick=()=>{const p=$('panel');p.style.display=p.style.display==='bloc
 // ---------- settings ----------
 function bind(id,key,fmt,scale=1){const el=$(id),out=$(id+'v');const f=()=>{S[key]=el.value*scale;out.textContent=fmt(el.value)};el.oninput=f;f()}
 bind('tol','tol',v=>v);bind('soft','soft',v=>v);bind('sun','sunAz',v=>v+'°');bind('con','con',v=>(v/100).toFixed(2),.01);
-bind('earth','earthSize',v=>v+'°');bind('sunel','sunEl',v=>v+'°');bind('kk','k',v=>(v/100).toFixed(2),.01);bind('gain','gain',v=>v+'×');bind('dist','dist',v=>v+'cm',.01);
+bind('earth','earthSize',v=>v+'°');bind('sunel','sunEl',v=>v+'°');bind('tsh','tshadow',v=>v+'%',.01);bind('osh','oshadow',v=>v+'%',.01);bind('oshd','oshade',v=>v+'%',.01);bind('esh','eshine',v=>v+'%',.01);
+['sun','sunel'].forEach(id=>$(id).addEventListener('input',()=>{shadowDirty=true}));bind('kk','k',v=>(v/100).toFixed(2),.01);bind('gain','gain',v=>v+'×');bind('dist','dist',v=>v+'cm',.01);
 $('alt').oninput=()=>{hBase=.3*Math.pow(10,$('alt').value/100*2.8);$('altv').textContent=fmtAlt(hBase)};$('alt').oninput();bind('fov','fov',v=>v+'°');
 $('qual').oninput=()=>{quality=$('qual').value/100;$('qualv').textContent=$('qual').value+'%'};$('qual').oninput();bind('stars','stars',v=>v+'%',.01);
 const PRESET={green:[0,177,64],blue:[0,71,187],black:[0,0,0],white:[255,255,255]};
