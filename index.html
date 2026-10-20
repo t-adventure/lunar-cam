@@ -195,7 +195,7 @@ button.bigstart{width:100%;min-height:66px;font-size:19px;font-weight:800;backgr
 <script>
 (()=>{
 const $=id=>document.getElementById(id);
-const VERSION='2026-10-20b';$('ver').textContent='v'+VERSION;
+const VERSION='2026-10-20d';$('ver').textContent='v'+VERSION;
 const cv=$('view'),ctx=cv.getContext('2d'),vid=$('vid');
 let W=0,H=0,DPR=1,ppd=10;
 const S={person:false,mirror:true,cut:1,inv:false,tshadow:.8,oshadow:1,oshade:.8,eshine:.4,gain:6,dist:.6,k:1.2,track:true,diff:false,tol:26,soft:12,keyOn:true,key:[0,177,64],keyName:'green',sunAz:160,con:1.2,earthSize:4,sunEl:14,fov:66,stars:.8,render:false,
@@ -289,6 +289,20 @@ function drawEarth(R,sunV){
   g=ctx.createRadialGradient(cx,cy,r*.92,cx,cy,r*1.06);g.addColorStop(0,'rgba(0,0,8,.94)');g.addColorStop(1,'rgba(0,0,8,0)');
   ctx.fillStyle=g;ctx.fillRect(x-r,y-r,r*2,r*2);ctx.restore();
 }
+const skyEl=az=>{const a=az*D2R;return Math.max(.08,.85+.8*Math.sin(a*2+1.1)+.5*Math.sin(a*5+.4)+.22*Math.sin(a*11+2.3))}; // ridge elevation in degrees
+function drawSkyline(R,sunV){
+  const sy=sunV[1],expo=1/Math.max(.22,sy),xx=(Math.max(0,sy)*expo+.012+S.eshine*.02)*.5,base=255*(1-Math.exp(-1.6*xx)),f=fwdAz(R);
+  let prev=null;
+  for(let az=f-85;az<=f+85;az+=1.5){
+    const e=skyEl(az),de=skyEl(az+.5)-skyEl(az-.5),sh=1+.35*Math.tanh(-de*7*Math.sin((S.sunAz-az)*D2R)),v=Math.max(0,Math.min(255,base*sh));
+    const c=toCam(R,dirVec(az,e)),d=-c[2];
+    if(d<=.02){prev=null;continue}
+    const cur=[W/2+c[0]/d*focal,H/2-c[1]/d*focal];
+    // a band between two neighbouring ridge samples; lit and shaded sides of the hills get different tones
+    if(prev){ctx.fillStyle=`rgb(${v|0},${v*.97|0},${v*.92|0})`;ctx.beginPath();ctx.moveTo(prev[0],H+600);ctx.lineTo(prev[0],prev[1]);ctx.lineTo(cur[0]+.6,cur[1]);ctx.lineTo(cur[0]+.6,H+600);ctx.closePath();ctx.fill()}
+    prev=cur;
+  }
+}
 function drawSun(R,sunV){
   const c=toCam(R,sunV),d=-c[2];if(d<=.02)return 0;
   const x=W/2+c[0]/d*focal,y=H/2-c[1]/d*focal,rad=focal*.38;
@@ -311,17 +325,17 @@ const hL=[],aL=[];
       for(let x=0;x<TS;x++){const fx=x/TS*cells,x0=Math.floor(fx),tx=fx-x0,sx=tx*tx*(3-2*tx),xa=x0%cells,xb=(x0+1)%cells;
         const v=(gr[ya+xa]*(1-sx)+gr[ya+xb]*sx)*(1-sy)+(gr[yb+xa]*(1-sx)+gr[yb+xb]*sx)*sy;
         h[y*TS+x]+=v*amp;al[y*TS+x]+=v*aamp}}};
-  for(const c of[4,8,16,32,64,128,256])octave(c,TS/c*.035,.05);
+  for(const c of[4,8,16,32,64,128,256])octave(c,TS/c*(c<=32?.011:.02),c<=16?.075:.05);
   octave(512,.16,.04);octave(1024,.12,.06);
   const wrapAdd=(cx,cy,ext,fn)=>{const R2=Math.min(TS/2-1,Math.ceil(ext));for(let dy=-R2;dy<=R2;dy++)for(let dx=-R2;dx<=R2;dx++){
     fn((((cy+dy)%TS+TS)%TS)*TS+(((cx+dx)%TS)+TS)%TS,dx,dy)}};
   // crater population: power-law size distribution (many small, few large), random age
   const craters=[];
-  for(let i=0;i<230;i++){const u=r(),rad=Math.min(230,4.2*Math.pow(1-u*.999,-1/1.35));craters.push({x:r()*TS|0,y:r()*TS|0,rad,age:r()})}
-  for(let i=0;i<7;i++)craters.push({x:r()*TS|0,y:r()*TS|0,rad:70+r()*140,age:r()*.8})
+  for(let i=0;i<44;i++){const u=r(),rad=Math.min(110,4.5*Math.pow(1-u*.999,-1/1.9));craters.push({x:r()*TS|0,y:r()*TS|0,rad,age:Math.pow(r(),.45)})}
+  for(let i=0;i<3;i++)craters.push({x:r()*TS|0,y:r()*TS|0,rad:55+r()*60,age:.65+r()*.3}) // wide, shallow, softened depressions
   // secondary crater chains radiating from the biggest craters
   for(const c of craters.slice().sort((p,q)=>q.rad-p.rad).slice(0,10)){
-    if(c.rad<45)continue;
+    if(c.rad<45||c.age>.4)continue;
     for(let k=0,n=2+((r()*2)|0);k<n;k++){const ang=r()*6.2832,m=4+((r()*4)|0);
       for(let j=0;j<m;j++){const dd=c.rad*(2.4+j*.55+r()*.3);craters.push({x:(c.x+Math.cos(ang)*dd)|0,y:(c.y+Math.sin(ang)*dd)|0,rad:2.5+r()*4,age:r()*.5,sec:true})}}}
   craters.sort((p,q)=>q.rad-p.rad); // big first: later (smaller) craters overprint older ones
@@ -329,7 +343,7 @@ const hL=[],aL=[];
   for(const c of craters){
     const rad=c.rad,age=c.age,fresh=1-age,complex=rad>55,mid=rad>14;
     // simple bowl (small) -> flat-floored (medium) -> terraced walls + central peak (large)
-    const d0=(complex?.11:mid?.16:.2)*rad*(1-.55*age),rimH=(.055+.03*fresh)*rad*(complex?.8:1),rimW=.09+.3*age;
+    const d0=(complex?.1:mid?.14:.18)*rad*(1-.75*age)*.8,rimH=(.025+.035*fresh)*rad*(complex?.8:1),rimW=.1+.35*age;
     const pw=complex?4.5:mid?2.6:2,peak=complex&&r()<.75?.35*d0:0,terr=complex?.025+r()*.04:0;
     const rays=!c.sec&&fresh>.7&&rad>22&&rad<80,ext=rad*(rays?4.2:complex?1.9:2.6),eq=ext/rad;
     const a1=r()*6.28,k1=3+((r()*4)|0),a2=r()*6.28,k2=7+((r()*5)|0),ar=r()*6.28,kr=9+((r()*8)|0);
@@ -354,13 +368,14 @@ const hL=[],aL=[];
       const qx=(dx*cs+dy*sn)/rad,qy=(-dx*sn+dy*cs)/(rad*asp),q2=qx*qx+qy*qy;if(q2>=1)continue;
       const p=(((cy+dy)%TS+TS)%TS)*TS+(((cx+dx)%TS)+TS)%TS,e=Math.pow(1-q2,.42);
       h[p]+=hh*e;al[p]+=.05*e-.03*(1-e)}};
-  for(let i=0;i<2600;i++){
+  for(let i=0;i<420;i++){
     let cx,cy;
-    if(r()<.45&&rockSpots.length){const c=rockSpots[(r()*rockSpots.length)|0],ang=r()*6.28,q=.95+Math.pow(r(),1.6)*1.5;
+    if(r()<.12&&rockSpots.length){const c=rockSpots[(r()*rockSpots.length)|0],ang=r()*6.28,q=.95+Math.pow(r(),1.6)*1.5;
       cx=(c.x+Math.cos(ang)*c.rad*q)|0;cy=(c.y+Math.sin(ang)*c.rad*q)|0}
     else{cx=r()*TS|0;cy=r()*TS|0}
-    const rad=1.2+Math.pow(r(),3.4)*10;
+    const rad=1.2+Math.pow(r(),3.8)*9;
     addRock(cx,cy,rad,.6+.7*r(),r()*3.14,rad*(.45+.5*r()))}
+  for(let i=0;i<1500;i++){const rad=.7+r()*1.1;addRock(r()*TS|0,r()*TS|0,rad,.7+.5*r(),r()*3.14,rad*.6)} // pebbles
   const h0=h,a0=new Uint8Array(N);for(let i=0;i<N;i++)a0[i]=clamp((.5+al[i])*255,15,245);
   hL.push(h0);aL.push(a0);
   for(let l=1;l<NLV;l++){const sz=TS>>l,ps=sz*2,ph=hL[l-1],pa=aL[l-1],nh=new Float32Array(sz*sz),na=new Uint8Array(sz*sz);
@@ -401,7 +416,7 @@ function layer(n,u,v,rr,sx,sy,sz){
 function drawGround(R,sunV,quality,hc,cx,cz){
   const gs=Math.max(1.5,Math.sqrt(W*H/(90000*quality))),gw=Math.ceil(W/gs),gh=Math.ceil(H/gs);
   if(!gImg||gImg.width!==gw||gImg.height!==gh){gcv.width=gw;gcv.height=gh;gImg=gctx.createImageData(gw,gh);g32=new Uint32Array(gImg.data.buffer)}
-  const sx=sunV[0],sy=sunV[1],sz=sunV[2],expo=.72/Math.max(.22,sy),texM=TILE/TS,inv=1/(focal),tsh=S.tshadow,amb=.012+S.eshine*.02,maxN=quality>=1.2?4:quality>=.8?3:quality>=.5?2:1;
+  const sx=sunV[0],sy=sunV[1],sz=sunV[2],expo=1/Math.max(.22,sy),texM=TILE/TS,inv=1/(focal),tsh=S.tshadow,amb=.012+S.eshine*.02,maxN=quality>=1.2?4:quality>=.8?3:quality>=.5?2:1;
   const R00=R[0],R01=R[1],R02=R[2],R10=R[3],R11=R[4],R12=R[5],R20=R[6],R21=R[7],R22=R[8];
   for(let j=0;j<gh;j++){
     const Y=(H/2-(j+.5)*gs)*inv;let q=j*gw;
@@ -694,15 +709,25 @@ function devMat(){
 }
 function onOri(e){if(e.beta==null)return;ori={a:e.alpha||0,b:e.beta,g:e.gamma||0}}
 let gyroPref=true,noGyro=false;
+const hasGyroAPI=!!(window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission);
+const GYRO_HELP='ジャイロ(動きセンサー)が許可されていません。iPhone/iPadでは、一度「拒否」すると、確認が再び出なくなります。Safariを完全に終了して開き直し、「許可」を選んでください。それでも出ない場合は、設定 → Safari → 詳細 → Webサイトデータ で、このサイトのデータを削除してから、もう一度開いてください。';
+async function verifyGyro(silent){ // events must really arrive; a PC never sends any
+  const t0=Date.now();
+  while(!ori&&gyroOn&&Date.now()-t0<3000)await new Promise(r=>setTimeout(r,100));
+  if(ori||!gyroOn)return;
+  gyroOn=false;removeEventListener('deviceorientation',onOri);
+  if(hasGyroAPI){refreshUI();showErr('ジャイロのデータが届きません。ページを再読み込みして、もう一度「ジャイロ」を押してください。')}
+  else{noGyro=true;refreshUI();if(!silent)toast('この端末では、動きセンサーを使えません')}
+}
 async function setGyro(on,silent){
   if(!on){gyroOn=false;removeEventListener('deviceorientation',onOri);refreshUI();yawT=fwdAz(Rcur);pitchT=fwdEl(Rcur);return}
   if(gyroOn||noGyro)return;
-  try{if(window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission){
-      if(await DeviceOrientationEvent.requestPermission()!=='granted'){if(!silent)toast('動きセンサーが許可されませんでした');return}}}
-  catch(e){if(!silent)toast('動きセンサーの許可が必要です');return}
+  if(hasGyroAPI){ // iOS: must be called directly from a tap
+    let r='error';try{r=await DeviceOrientationEvent.requestPermission()}catch(e){}
+    if(r!=='granted'){if(silent)toast('ジャイロは許可されていません。「ジャイロ」ボタンで、あとからONにできます');else showErr(GYRO_HELP);return}
+  }
   ori=null;needZero=true;gyroOn=true;addEventListener('deviceorientation',onOri);refreshUI();
-  await new Promise(r=>setTimeout(r,1500)); // a PC fires no sensor data: switch the button off and hide it
-  if(!ori&&gyroOn){gyroOn=false;removeEventListener('deviceorientation',onOri);noGyro=true;refreshUI();if(!silent)toast('この端末では、動きセンサーを使えません')}
+  verifyGyro(silent); // not awaited
 }
 async function toggleGyro(){if(gyroOn){gyroPref=false;await setGyro(false)}else{gyroPref=true;await setGyro(true,false)}}
 $('gyro').onclick=toggleGyro;
@@ -799,6 +824,7 @@ function frame(){
     drawStars(R);
     drawEarth(R,sunV);
     const sunIn=drawSun(R,sunV);
+    drawSkyline(R,sunV);
     drawGround(R,sunV,quality,camH,camX,camZ);
     const v=ctx.createRadialGradient(W/2,H/2,Math.min(W,H)*.35,W/2,H/2,Math.max(W,H)*.75);v.addColorStop(0,'rgba(0,0,0,0)');v.addColorStop(1,'rgba(0,0,0,.4)');
     ctx.fillStyle=v;ctx.fillRect(0,0,W,H);
@@ -847,8 +873,8 @@ async function startCam(){
 }
 function stopCam(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;camOn=false;bbox=null;
   idleHint();refreshUI()}
-$('cam').onclick=()=>{
-  if(gyroPref&&!gyroOn&&!noGyro)setGyro(true,true); // the sensor permission must be requested inside this tap
+$('cam').onclick=async()=>{
+  if(gyroPref&&!gyroOn&&!noGyro)await setGyro(true,true); // the sensor permission must be requested inside this tap
   startCam();
 };
 $('camstop').onclick=()=>stopCam();
