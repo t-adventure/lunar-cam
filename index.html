@@ -2,16 +2,16 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,minimum-scale=1,maximum-scale=1,viewport-fit=cover,user-scalable=no">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Lunar Cam – 月面撮影シミュレータ</title>
 <style>
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-user-select:none;user-select:none}
-html,body{margin:0;height:100%;background:#000;color:#e8ecf4;font:14px -apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif;overflow:hidden;overscroll-behavior:none}
+html,body{touch-action:none;-webkit-text-size-adjust:100%;margin:0;height:100%;background:#000;color:#e8ecf4;font:14px -apple-system,BlinkMacSystemFont,"Hiragino Sans",sans-serif;overflow:hidden;overscroll-behavior:none}
 canvas{position:fixed;inset:0;width:100%;height:100%;touch-action:none;display:block}
-button{font:inherit;color:#e8ecf4;background:rgba(40,48,70,.86);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:9px 10px;min-width:0;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);cursor:pointer}
+button{touch-action:manipulation;font:inherit;color:#e8ecf4;background:rgba(40,48,70,.86);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:9px 10px;min-width:0;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);cursor:pointer}
 button:active{transform:scale(.97)}
 .row{display:flex;gap:6px;justify-content:center;flex-wrap:wrap}
 
@@ -45,7 +45,7 @@ button.main.on{background:#2f6df0;border-color:#9dbcff;color:#fff}
 .st{font-weight:800}
 
 /* ---- settings panel with tabs ---- */
-#panel{display:none;background:rgba(14,18,30,.94);border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:8px 12px 10px;max-height:46vh;overflow:auto;-webkit-overflow-scrolling:touch}
+#panel{touch-action:pan-y;display:none;background:rgba(14,18,30,.94);border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:8px 12px 10px;max-height:46vh;overflow:auto;-webkit-overflow-scrolling:touch}
 #tabs{display:flex;gap:4px;position:sticky;top:0;background:rgba(14,18,30,.97);padding:2px 0 6px;z-index:1}
 #tabs .tab{flex:1;padding:8px 2px;font-size:13px;border-radius:10px}
 #panel label{display:grid;grid-template-columns:112px 1fr 44px;align-items:center;gap:8px;margin:7px 0;font-size:13px}
@@ -59,12 +59,32 @@ body:not(.person) .per-only{display:none!important}
 #modal{position:fixed;inset:0;background:rgba(0,0,0,.9);display:none;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:calc(env(safe-area-inset-top) + 12px) 12px calc(env(safe-area-inset-bottom) + 12px);z-index:10}
 #modal img,#modal video{max-width:100%;max-height:72vh;border-radius:8px;-webkit-user-select:auto;user-select:auto;-webkit-touch-callout:default}
 #modal p{margin:0;color:#aab4c8;font-size:12px;text-align:center}
+#err{display:none;position:fixed;left:10px;right:10px;top:calc(env(safe-area-inset-top) + 120px);z-index:20;background:rgba(150,30,30,.95);color:#fff;border-radius:12px;padding:10px 14px;font-size:13px;line-height:1.5;box-shadow:0 4px 16px rgba(0,0,0,.5)}
+#toast{display:none;position:fixed;left:50%;transform:translateX(-50%);top:30%;z-index:15;max-width:86%;background:rgba(20,60,120,.92);color:#fff;border-radius:14px;padding:10px 16px;font-size:14px;text-align:center;pointer-events:none}
+/* ---- start card (before the camera is on) and camera-on layout ---- */
+body:not(.camon) #bottom{display:none}
+body.camon #startcard{display:none}
+#camstop{display:none;pointer-events:auto;padding:4px 10px;font-size:12px;border-radius:14px}
+body.camon #camstop{display:inline-block}
+#startcard{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:20px;z-index:5;pointer-events:none}
+#startcard .card{pointer-events:auto;width:min(420px,100%);margin-top:120px;background:rgba(10,14,26,.86);border:1px solid rgba(255,255,255,.22);border-radius:20px;padding:20px 18px;text-align:center;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+#startcard .logo{font-size:20px;font-weight:800}
+#mdesc{font-size:14px;line-height:1.7;color:#d3dbee;margin:8px 0 14px}
+button.bigstart{width:100%;min-height:66px;font-size:19px;font-weight:800;background:#1f9d55;border-color:#7ee2a8;color:#fff;border-radius:16px;box-shadow:0 4px 18px rgba(31,157,85,.5)}
+.steps{text-align:left;font-size:13px;color:#b6c0d6;line-height:1.9;margin:14px 0 6px;padding-left:22px}
+.note{font-size:11px;color:#8d98b0;line-height:1.6}
+#mainrow{align-items:flex-end}
+#snap{flex:0 0 96px;min-height:92px;background:none;border:0;padding:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;gap:3px;backdrop-filter:none;-webkit-backdrop-filter:none}
+#snap .ring{display:block;width:68px;height:68px;border-radius:50%;background:#fff;border:5px solid rgba(255,255,255,.5);box-shadow:0 0 0 3px rgba(0,0,0,.55),0 3px 12px rgba(0,0,0,.5)}
+#snap:active .ring{transform:scale(.9)}
+#snap .tx{font-size:12px;font-weight:800;color:#fff;text-shadow:0 1px 3px #000}
+#flash{position:fixed;inset:0;background:#fff;opacity:0;pointer-events:none;z-index:12;transition:opacity .35s}
 </style>
 </head>
 <body>
 <canvas id="view"></canvas>
 <div id="top">
-  <div id="topline"><span>🌕 LUNAR CAM <small id="ver"></small></span><span id="rec">● REC 00:00</span><span id="status"></span></div>
+  <div id="topline"><span>🌕 LUNAR CAM <small id="ver"></small></span><span id="rec">● REC 00:00</span><button class="chip" id="camstop">⏹ カメラ停止</button><span id="status"></span></div>
   <div id="modeseg" role="tablist" aria-label="撮影モード">
     <button class="seg on" id="mode-obj" role="tab" title="タップで指定した「もの」を最前面に残します">📦 ものを撮る</button>
     <button class="seg" id="mode-per" role="tab" title="人物を自動で検出して最前面に残します">🧍 人物を撮る</button>
@@ -140,31 +160,42 @@ body:not(.person) .per-only{display:none!important}
       <button class="chip" data-v="horizon">➖ 水平線</button>
       <button class="chip" data-v="earth">🌍 地球</button>
       <button class="chip" data-v="sky">✨ 星空</button>
-      <button class="chip" id="gyro"></button>
       <button class="chip" id="zero" title="いま向いている方向を正面にします">⌖ 正面</button>
       <button class="chip obj-only" id="untrack" style="display:none">✖ 対象を解除</button>
     </div>
   </div>
   <div id="mainrow">
-    <button class="main go" id="cam"><span class="ic">📷</span><span class="tx">撮影開始</span></button>
-    <button class="main" id="fx"><span class="ic">🌕</span><span class="tx">背景合成</span></button>
-    <button class="main" id="snap"><span class="ic">💾</span><span class="tx">写真を保存</span></button>
-    <button class="main" id="recbtn"><span class="ic">⏺</span><span class="tx">録画</span></button>
     <button class="main" id="cfg"><span class="ic">⚙</span><span class="tx">設定</span></button>
+    <button class="main" id="fx"><span class="ic">🌕</span><span class="tx">背景合成</span></button>
+    <button id="snap" aria-label="写真を撮影"><span class="ring"></span><span class="tx">撮影(写真)</span></button>
+    <button class="main" id="recbtn"><span class="ic">🎥</span><span class="tx">動画撮影</span></button>
+    <button class="main" id="gyro"></button>
   </div>
 </div>
+
+<div id="startcard">
+  <div class="card">
+    <div class="logo">🌕 LUNAR CAM</div>
+    <div id="mdesc"></div>
+    <button class="bigstart" id="cam">📷 カメラを起動して始める</button>
+    <ol class="steps"><li>「カメラを起動」を押して、カメラを許可する</li><li>撮りたいものをタップ(人物モードは自動)</li><li>端末を動かして構図を決め、📸 で撮影</li></ol>
+    <div class="note">端末を動かすと、月面や星空も動きます。動きセンサーの許可が出たら「許可」を押してください。</div>
+  </div>
+</div>
+<div id="flash"></div>
 
 <div id="modal">
   <div id="mediabox"></div>
   <p id="mhint"></p>
   <div class="row"><button id="mshare">⬆ 保存 / 共有</button><button id="mclose">閉じる</button></div>
 </div>
-<video id="vid" playsinline muted autoplay style="display:none"></video>
+<div id="err" role="alert"></div><div id="toast"></div>
+<video id="vid" playsinline muted autoplay style="position:fixed;left:0;top:0;width:2px;height:2px;opacity:0;pointer-events:none"></video>
 
 <script>
 (()=>{
 const $=id=>document.getElementById(id);
-const VERSION='2026-10-18g';$('ver').textContent='v'+VERSION;
+const VERSION='2026-10-20b';$('ver').textContent='v'+VERSION;
 const cv=$('view'),ctx=cv.getContext('2d'),vid=$('vid');
 let W=0,H=0,DPR=1,ppd=10;
 const S={person:false,mirror:true,cut:1,inv:false,tshadow:.8,oshadow:1,oshade:.8,eshine:.4,gain:6,dist:.6,k:1.2,track:true,diff:false,tol:26,soft:12,keyOn:true,key:[0,177,64],keyName:'green',sunAz:160,con:1.2,earthSize:4,sunEl:14,fov:66,stars:.8,render:false,
@@ -644,9 +675,10 @@ function updateHint(){
   if(S.person){
     if(segState==='error')t='人物モデルを読み込めませんでした: '+segErr;
     else if(segState!=='ready')t='人物モデルを読み込み中…(初回は少し時間がかかります)';
-  }else if(!TG)t='撮影したいもの(模型)をタップしてください';
+    else if(!pInfo)t='カメラに人物を映してください(自動で検出します)';
+  }else if(!TG)t='① 撮りたいものを、画面上でタップしてください\n(自動で切り出して、背景を月面にします)';
   else if(tgLost>6)t='対象を見失いました。もう一度ものをタップしてください';
-  if(t){if(t!==hintTxt||!hintShown){h.textContent=t;h.style.display='';hintTxt=t}hintShown=true}
+  if(t){if(t!==hintTxt||!hintShown){h.innerHTML=t.replace(/\n/g,'<br>');h.style.display='';hintTxt=t}hintShown=true}
   else if(hintShown){h.style.display='none';hintShown=false;hintTxt=''}
 }
 $('untrack').onclick=()=>{TG=null;tgLost=0;Aal=null;bbox=null;objRef=null;needRef=false};
@@ -661,18 +693,23 @@ function devMat(){
   return mmul(mmul(mmul(mmul(rotY(o.a*D2R),rotX(o.b*D2R)),rotZ(-o.g*D2R)),rotX(-Math.PI/2)),rotZ(-ang*D2R));
 }
 function onOri(e){if(e.beta==null)return;ori={a:e.alpha||0,b:e.beta,g:e.gamma||0}}
-async function toggleGyro(){
-  if(gyroOn){gyroOn=false;removeEventListener('deviceorientation',onOri);refreshUI();
-    yawT=fwdAz(Rcur);pitchT=fwdEl(Rcur);return}
-  try{if(window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission){if(await DeviceOrientationEvent.requestPermission()!=='granted')return}}
-  catch(e){alert('モーションセンサーの許可が必要です');return}
+let gyroPref=true,noGyro=false;
+async function setGyro(on,silent){
+  if(!on){gyroOn=false;removeEventListener('deviceorientation',onOri);refreshUI();yawT=fwdAz(Rcur);pitchT=fwdEl(Rcur);return}
+  if(gyroOn||noGyro)return;
+  try{if(window.DeviceOrientationEvent&&DeviceOrientationEvent.requestPermission){
+      if(await DeviceOrientationEvent.requestPermission()!=='granted'){if(!silent)toast('動きセンサーが許可されませんでした');return}}}
+  catch(e){if(!silent)toast('動きセンサーの許可が必要です');return}
   ori=null;needZero=true;gyroOn=true;addEventListener('deviceorientation',onOri);refreshUI();
+  await new Promise(r=>setTimeout(r,1500)); // a PC fires no sensor data: switch the button off and hide it
+  if(!ori&&gyroOn){gyroOn=false;removeEventListener('deviceorientation',onOri);noGyro=true;refreshUI();if(!silent)toast('この端末では、動きセンサーを使えません')}
 }
+async function toggleGyro(){if(gyroOn){gyroPref=false;await setGyro(false)}else{gyroPref=true;await setGyro(true,false)}}
 $('gyro').onclick=toggleGyro;
 $('zero').onclick=()=>{if(gyroOn)needZero=true;else{yawT=0}};
 document.querySelectorAll('#presets [data-v]').forEach(b=>b.onclick=async()=>{
   const k=b.dataset.v,v=VIEWS[k];
-  if(gyroOn){if(k==='earth'){yawOff+=wrap(S.earthAz-fwdAz(Rcur));return}await toggleGyro()}
+  if(gyroOn){if(k==='earth'){yawOff+=wrap(S.earthAz-fwdAz(Rcur));return}gyroPref=false;await setGyro(false);toast('ジャイロをOFFにして、視点を固定しました')}
   yawT=v[0];pitchT=v[1]});
 let drag=null,pinchD=0,pinched=false;const ptrs=new Map();
 function setAlt(h){hBase=clamp(h,.15,300);const v=Math.round(Math.log10(hBase/.3)/2.8*100);$('alt').value=v;$('altv').textContent=fmtAlt(hBase)}
@@ -740,6 +777,8 @@ function frame(){
   if(!(S.dist>0))S.dist=.6;
   const info=S.person?(dim&&!dim.raw?pInfo:null):(S.track&&TG&&tgLost<=6?{size:Math.sqrt(TG.area)/MW,cx:(TG.box.x0+TG.box.x1+1)/2/MW,cy:(TG.box.y0+TG.box.y1+1)/2/MH}:null);
   if(S.person&&info&&!hadInfo)needRef=true;hadInfo=!!info;
+  if(camOn&&!dim&&performance.now()-camStartT>4000&&$('err').style.display!=='block')showErr('カメラの映像を受信できません。別のブラウザ(Chrome / Safari)で開くか、他のアプリがカメラを使っていないか確認してください。');
+  if(camOn&&dim&&!S.render&&!autoOnDone&&!dim.raw&&(S.person?!!pInfo:(S.track&&TG&&tgLost<=6))){S.render=true;autoOnDone=true;refreshUI();toast('🌕 背景合成をONにしました(OFFで元の映像に戻ります)')}
   if(camOn&&dim&&info){
     const cr=coverRect(dim.kw,dim.kh),size=info.size,ocx=info.cx,ocy=info.cy;
     const spx=cr.dx+ocx*dim.kw*cr.s,spy=cr.dy+ocy*dim.kh*cr.s;
@@ -777,20 +816,42 @@ function frame(){
 requestAnimationFrame(frame);
 
 // ---------- camera ----------
+let camStartT=0,autoOnDone=false,errTimer=0,toastTimer=0;
+function showErr(msg){const e=$('err');e.textContent=msg+'(タップで閉じる)';e.style.display='block';e.onclick=()=>{e.style.display='none'}}
+function toast(msg){const t=$('toast');t.textContent=msg;t.style.display='block';clearTimeout(toastTimer);toastTimer=setTimeout(()=>{t.style.display='none'},3500)}
+function camErrMsg(e){
+  const n=e&&e.name;
+  if(n==='NotAllowedError'||n==='SecurityError')return 'カメラの使用が許可されていません。ブラウザの設定で、このサイトのカメラを「許可」にしてから、もう一度「撮影開始」を押してください。';
+  if(n==='NotFoundError'||n==='OverconstrainedError')return 'カメラが見つかりません。カメラが接続されているか確認してください。';
+  if(n==='NotReadableError'||n==='AbortError')return 'カメラを使えません。他のアプリ(Zoomなど)がカメラを使っていないか確認してください。';
+  return 'カメラを起動できませんでした: '+(e&&e.message||e);
+}
+async function getStream(){
+  const tries=[{video:{facingMode:{ideal:S.facing},width:{ideal:1280},height:{ideal:720}},audio:false},{video:{facingMode:S.facing},audio:false},{video:true,audio:false}];
+  let err;for(const c of tries){try{return await navigator.mediaDevices.getUserMedia(c)}catch(e){err=e;if(e&&(e.name==='NotAllowedError'||e.name==='SecurityError'))throw e}}
+  throw err;
+}
 async function startCam(){
   if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
-    alert('カメラを使うには HTTPS で開く必要があります(https:// の URL でアクセスしてください)。');return}
+    showErr('カメラを使うには HTTPS で開く必要があります(https:// で始まるURLでアクセスしてください)。');return}
   try{
     if(stream)stream.getTracks().forEach(t=>t.stop());
-    stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:S.facing},width:{ideal:1280},height:{ideal:720}},audio:false});
-    vid.srcObject=stream;await vid.play();camOn=true;
-    setBtn($('cam'),'⏹','カメラ停止');$('cam').classList.add('red');$('cam').classList.remove('go');$('hint').style.display='none';refreshUI();
+    stream=await getStream();
+    vid.srcObject=stream;
+    try{await vid.play()}catch(e){/* muted + playsinline: continue, frames may still arrive */}
+    await new Promise(res=>{if(vid.readyState>=2)res();else{vid.onloadeddata=res;setTimeout(res,3000)}});
+    camOn=true;camStartT=performance.now();autoOnDone=false;$('err').style.display='none';
+    $('hint').style.display='none';refreshUI();
     try{if(navigator.wakeLock)navigator.wakeLock.request('screen')}catch(e){}
-  }catch(e){alert('カメラを起動できませんでした: '+e.message)}
+  }catch(e){showErr(camErrMsg(e))}
 }
 function stopCam(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;camOn=false;bbox=null;
-  setBtn($('cam'),'📷','撮影開始');$('cam').classList.remove('red');$('cam').classList.add('go');idleHint();refreshUI()}
-$('cam').onclick=()=>camOn?stopCam():startCam();
+  idleHint();refreshUI()}
+$('cam').onclick=()=>{
+  if(gyroPref&&!gyroOn&&!noGyro)setGyro(true,true); // the sensor permission must be requested inside this tap
+  startCam();
+};
+$('camstop').onclick=()=>stopCam();
 function applyMode(){
   document.body.classList.toggle('person',S.person);
   needRef=true;objRef=null;sSm=1;Tsm=[0,0,0];bbox=null;pBox=null;pInfo=null;hadInfo=false;
@@ -843,6 +904,7 @@ function showResult(blob,name,isVideo){
   modal.style.display='flex';
 }
 $('snap').onclick=()=>{
+  const f=$('flash');f.style.opacity='.85';setTimeout(()=>{f.style.opacity='0'},90);
   cv.toBlob(b=>{if(b)showResult(b,`lunar-${stamp()}.png`,false)},'image/png');
 };
 $('mclose').onclick=()=>{modal.style.display='none';$('mediabox').innerHTML='';if(cur){URL.revokeObjectURL(cur.url);cur=null}};
@@ -858,13 +920,20 @@ $('recbtn').onclick=()=>{
   const mt=['video/mp4;codecs=avc1','video/mp4','video/webm;codecs=vp9','video/webm'].find(t=>MediaRecorder.isTypeSupported(t));
   rec=new MediaRecorder(cv.captureStream(30),mt?{mimeType:mt,videoBitsPerSecond:6e6}:{});chunks=[];
   rec.ondataavailable=e=>{if(e.data&&e.data.size)chunks.push(e.data)};
-  rec.onstop=()=>{clearInterval(recTimer);$('rec').style.display='none';$('recbtn').classList.remove('red');setBtn($('recbtn'),'⏺','録画');
+  rec.onstop=()=>{clearInterval(recTimer);$('rec').style.display='none';$('recbtn').classList.remove('red');setBtn($('recbtn'),'🎥','動画撮影');
     const type=(rec.mimeType||mt||'video/webm').split(';')[0];const ext=type.includes('mp4')?'mp4':'webm';
     const blob=new Blob(chunks,{type});rec=null;showResult(blob,`lunar-${stamp()}.${ext}`,true)};
-  rec.start(500);recT=Date.now();$('rec').style.display='inline';$('recbtn').classList.add('red');setBtn($('recbtn'),'⏹','録画を停止');
+  rec.start(500);recT=Date.now();$('rec').style.display='inline';$('recbtn').classList.add('red');setBtn($('recbtn'),'⏹','撮影を停止');
   recTimer=setInterval(()=>{const s=(Date.now()-recT)/1000|0;$('rec').textContent=`● REC ${String(s/60|0).padStart(2,'0')}:${String(s%60).padStart(2,'0')}`},250);
 };
 
+// ---------- global safety nets ----------
+['gesturestart','gesturechange','gestureend'].forEach(t=>{if(document.addEventListener)document.addEventListener(t,e=>e.preventDefault(),{passive:false})});
+if(document.addEventListener)document.addEventListener('touchmove',e=>{if(e.touches&&e.touches.length>1)e.preventDefault()},{passive:false});
+if(window.addEventListener){
+  window.addEventListener('error',e=>{if(e&&e.message)showErr('エラーが発生しました: '+e.message)});
+  window.addEventListener('unhandledrejection',e=>{const m=e&&e.reason&&(e.reason.message||e.reason);if(m)showErr('エラーが発生しました: '+m)});
+}
 // ---------- UI state ----------
 function setBtn(b,ic,tx){b.innerHTML='<span class="ic">'+ic+'</span><span class="tx">'+tx+'</span>'}
 const onOff=on=>'<span class="st">'+(on?'ON':'OFF')+'</span>';
@@ -875,17 +944,19 @@ function showTab(){
 }
 document.querySelectorAll('#tabs .tab').forEach(b=>{b.onclick=()=>{curTab=b.dataset.t;showTab()}});
 function idleHint(){
-  const h=$('hint');hintShown=false;hintTxt='';h.style.display='';
-  h.innerHTML=S.person
-    ?'「📷 撮影開始」でカメラを起動します。<br><b>人物を自動で検出</b>し、人物を最前面に残して、<br>それ以外を月面・宇宙空間に置き換えます。<br>(「🌕 背景合成」をONにすると、合成されます)'
-    :'「📷 撮影開始」でカメラを起動します。<br>映った<b>ものをタップ</b>すると、そのものが最前面に残り、<br>それ以外が月面・宇宙空間に置き換わります。<br>(「🌕 背景合成」をONにすると、合成されます)';
+  const h=$('hint');hintShown=false;hintTxt='';h.style.display='none';
+  $('mdesc').innerHTML=S.person
+    ?'🧍 <b>人物モード</b>: 人物を自動で検出して、人物だけを残し、背景を月面・宇宙空間にします。'
+    :'📦 <b>ものモード</b>: 映ったものをタップすると、そのものだけを残し、背景を月面・宇宙空間にします。';
 }
 function pill(el,text,cls){el.textContent=text;el.className='pill'+(cls?' '+cls:'')}
 function refreshUI(){
   $('mode-obj').classList.toggle('on',!S.person);$('mode-per').classList.toggle('on',S.person);
   document.body.classList.toggle('person',S.person);
   $('fx').innerHTML='<span class="ic">🌕</span><span class="tx">背景合成 '+onOff(S.render)+'</span>';$('fx').classList.toggle('on',S.render);
-  $('gyro').innerHTML='🧭 ジャイロ '+onOff(gyroOn);$('gyro').classList.toggle('on',gyroOn);
+  $('gyro').innerHTML='<span class="ic">🧭</span><span class="tx">ジャイロ '+onOff(gyroOn)+'</span>';$('gyro').classList.toggle('on',gyroOn);
+  $('gyro').style.display=noGyro?'none':'';$('zero').style.display=noGyro?'none':'';$('pGyro').style.display=noGyro?'none':'';
+  document.body.classList.toggle('camon',camOn);
   $('mirror').innerHTML='🪞 鏡像表示 '+onOff(S.mirror);$('mirror').classList.toggle('on',S.mirror);
   $('invmask').innerHTML='⇄ マスク反転 '+onOff(S.inv);$('invmask').classList.toggle('on',S.inv);
   $('cfg').classList.toggle('on',$('panel').style.display==='block');
