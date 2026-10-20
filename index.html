@@ -160,7 +160,7 @@ button.bigstart{width:100%;min-height:66px;font-size:19px;font-weight:800;backgr
       <button class="chip" data-v="horizon">➖ 水平線</button>
       <button class="chip" data-v="earth">🌍 地球</button>
       <button class="chip" data-v="sky">✨ 星空</button>
-      <button class="chip" id="zero" title="いま向いている方向を正面にします">⌖ 正面</button>
+      <button class="chip obj-only" id="zero" title="いま向いている方向を正面にします">⌖ 正面</button>
       <button class="chip obj-only" id="untrack" style="display:none">✖ 対象を解除</button>
     </div>
   </div>
@@ -169,7 +169,7 @@ button.bigstart{width:100%;min-height:66px;font-size:19px;font-weight:800;backgr
     <button class="main" id="fx"><span class="ic">🌕</span><span class="tx">背景合成</span></button>
     <button id="snap" aria-label="写真を撮影"><span class="ring"></span><span class="tx">撮影(写真)</span></button>
     <button class="main" id="recbtn"><span class="ic">🎥</span><span class="tx">動画撮影</span></button>
-    <button class="main" id="gyro"></button>
+    <button class="main obj-only" id="gyro"></button>
   </div>
 </div>
 
@@ -178,8 +178,8 @@ button.bigstart{width:100%;min-height:66px;font-size:19px;font-weight:800;backgr
     <div class="logo">🌕 LUNAR CAM</div>
     <div id="mdesc"></div>
     <button class="bigstart" id="cam">📷 カメラを起動して始める</button>
-    <ol class="steps"><li>「カメラを起動」を押して、カメラを許可する</li><li>撮りたいものをタップ(人物モードは自動)</li><li>端末を動かして構図を決め、📸 で撮影</li></ol>
-    <div class="note">端末を動かすと、月面や星空も動きます。動きセンサーの許可が出たら「許可」を押してください。</div>
+    <ol class="steps"><li>「カメラを起動」を押して、カメラを許可する</li><li>撮りたいものをタップ(人物モードは自動)</li><li>構図を決めて、📸 で撮影</li></ol>
+    <div class="note" id="gnote">端末を動かすと、月面や星空も動きます。動きセンサーの許可が出たら「許可」を押してください。</div>
   </div>
 </div>
 <div id="flash"></div>
@@ -195,7 +195,7 @@ button.bigstart{width:100%;min-height:66px;font-size:19px;font-weight:800;backgr
 <script>
 (()=>{
 const $=id=>document.getElementById(id);
-const VERSION='2026-10-20d';$('ver').textContent='v'+VERSION;
+const VERSION='2026-10-20e';$('ver').textContent='v'+VERSION;
 const cv=$('view'),ctx=cv.getContext('2d'),vid=$('vid');
 let W=0,H=0,DPR=1,ppd=10;
 const S={person:false,mirror:true,cut:1,inv:false,tshadow:.8,oshadow:1,oshade:.8,eshine:.4,gain:6,dist:.6,k:1.2,track:true,diff:false,tol:26,soft:12,keyOn:true,key:[0,177,64],keyName:'green',sunAz:160,con:1.2,earthSize:4,sunEl:14,fov:66,stars:.8,render:false,
@@ -874,12 +874,14 @@ async function startCam(){
 function stopCam(){if(stream)stream.getTracks().forEach(t=>t.stop());stream=null;camOn=false;bbox=null;
   idleHint();refreshUI()}
 $('cam').onclick=async()=>{
-  if(gyroPref&&!gyroOn&&!noGyro)await setGyro(true,true); // the sensor permission must be requested inside this tap
+  if(gyroPref&&!gyroOn&&!noGyro&&!S.person)await setGyro(true,true); // object mode only; the permission must be requested inside this tap
   startCam();
 };
 $('camstop').onclick=()=>stopCam();
 function applyMode(){
   document.body.classList.toggle('person',S.person);
+  if(S.person){if(gyroOn)setGyro(false);yawT=0;pitchT=-12} // person mode: gyro off, fixed view
+  else if(gyroPref&&!gyroOn&&!noGyro&&camOn)setGyro(true,true); // back to object mode: resume (this runs inside the mode tap)
   needRef=true;objRef=null;sSm=1;Tsm=[0,0,0];bbox=null;pBox=null;pInfo=null;hadInfo=false;
   S.facing=S.person?'user':'environment';if(camOn)startCam();else idleHint();
   refreshUI();
@@ -970,7 +972,7 @@ function showTab(){
 }
 document.querySelectorAll('#tabs .tab').forEach(b=>{b.onclick=()=>{curTab=b.dataset.t;showTab()}});
 function idleHint(){
-  const h=$('hint');hintShown=false;hintTxt='';h.style.display='none';
+  const h=$('hint');hintShown=false;hintTxt='';h.style.display='none';$('gnote').style.display=S.person?'none':'';
   $('mdesc').innerHTML=S.person
     ?'🧍 <b>人物モード</b>: 人物を自動で検出して、人物だけを残し、背景を月面・宇宙空間にします。'
     :'📦 <b>ものモード</b>: 映ったものをタップすると、そのものだけを残し、背景を月面・宇宙空間にします。';
@@ -981,7 +983,7 @@ function refreshUI(){
   document.body.classList.toggle('person',S.person);
   $('fx').innerHTML='<span class="ic">🌕</span><span class="tx">背景合成 '+onOff(S.render)+'</span>';$('fx').classList.toggle('on',S.render);
   $('gyro').innerHTML='<span class="ic">🧭</span><span class="tx">ジャイロ '+onOff(gyroOn)+'</span>';$('gyro').classList.toggle('on',gyroOn);
-  $('gyro').style.display=noGyro?'none':'';$('zero').style.display=noGyro?'none':'';$('pGyro').style.display=noGyro?'none':'';
+  const gHide=noGyro||S.person;$('gyro').style.display=gHide?'none':'';$('zero').style.display=gHide?'none':'';$('pGyro').style.display=gHide?'none':'';
   document.body.classList.toggle('camon',camOn);
   $('mirror').innerHTML='🪞 鏡像表示 '+onOff(S.mirror);$('mirror').classList.toggle('on',S.mirror);
   $('invmask').innerHTML='⇄ マスク反転 '+onOff(S.inv);$('invmask').classList.toggle('on',S.inv);
